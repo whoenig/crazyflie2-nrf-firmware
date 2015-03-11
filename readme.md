@@ -31,6 +31,17 @@ sudo make install
 Now you can debug using `make openocd BLE=0` and `make gdb BLE=0`.
 It is also possible to connect to openocd using Eclipse or Qt Creator.
 
+Real-Time Terminal
+------------------
+
+SEGGERs Real-Time Terminal (RTT) allows to use printf where the data is communicated via JTAG.
+It is faster than traditional methods (UART/SWO): https://www.segger.com/jlink-real-time-terminal.html.
+The code already uses RTT. To see the messages on the client side, do the following:
+
+```
+./JLinkExe -device NRF51822
+./JLinkRTTClient (or use telnet or use API)
+```
 
 
 Original Docs
