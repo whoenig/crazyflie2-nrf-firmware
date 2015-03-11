@@ -1,6 +1,41 @@
 Crazyflie 2.0 NRF51 firmware
 ============================
 
+This branch sends continuously packages via the radio in PTX mode.
+
+Setup J-Link
+------------
+
+We use a J-Link EDU for debugging.
+
+* Download software and documentation from SEGGOR: https://www.segger.com/jlink-software.html
+* Follow the instructions (In case of V4.96l it was enough to extract the archive, add a udev-rule, and reboot the system)
+* Run `./JLinkExe -device NRF51822` in order to test the connection
+
+Debugging
+---------
+
+We use openocd for debugging. However, the SEGGOR gdbserver might work as well.
+The openocd version of Ubuntu is too old (0.7). The latest released version is too old as well (0.8).
+Instead, install the latest version:
+
+```
+git clone https://github.com/ntfreak/openocd.git
+cd openocd
+./bootstrap
+./configure
+make
+sudo make install
+```
+
+Now you can debug using `make openocd BLE=0` and `make gdb BLE=0`.
+It is also possible to connect to openocd using Eclipse or Qt Creator.
+
+
+
+Original Docs
+-------------
+
 Source code of the firmware running in the Crazyflie 2.0 nRF51822.
 This microcontroller have a couple of roles:
  - Power management (ON/OFF logic and battery handling)

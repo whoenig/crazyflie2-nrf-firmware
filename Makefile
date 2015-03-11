@@ -16,9 +16,9 @@ SIZE = $(CROSS_COMPILE)size
 GDB=$(CROSS_COMPILE)gdb
 
 OPENOCD           ?= openocd
-OPENOCD_DIR       ?= 
-OPENOCD_INTERFACE ?= $(OPENOCD_DIR)interface/stlink-v2.cfg
-OPENOCD_TARGET    ?= target/nrf51_stlink.tcl
+OPENOCD_DIR       ?=
+OPENOCD_INTERFACE ?= $(OPENOCD_DIR)interface/jlink.cfg
+OPENOCD_TARGET    ?= target/nrf51.cfg
 
 
 NRF51_SDK ?= nrf51_sdk/nrf51822
@@ -140,7 +140,7 @@ reset:
 	               -c reset -c shutdown
 
 openocd: $(PROGRAM).elf
-	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -f $(OPENOCD_TARGET) -c init -c targets
+	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -c "transport select swd" -f $(OPENOCD_TARGET) -c init -c targets
 
 
 semihosting: $(PROGRAM).elf
