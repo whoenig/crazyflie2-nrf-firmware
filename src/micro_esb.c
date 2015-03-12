@@ -633,7 +633,7 @@ static void on_radio_disabled_esb_dpl_tx_noack()
     if(m_tx_fifo.count == 0)
     {
         m_uesb_mainstate = UESB_STATE_IDLE;
-	if(m_event_handler != 0) m_event_handler();
+        if(m_event_handler != 0) m_event_handler();
     }
     else
     {
@@ -690,15 +690,15 @@ static void on_radio_disabled_esb_dpl_tx_wait_for_ack()
         }
 
         if((m_tx_fifo.count == 0) || (m_config_local.tx_mode == UESB_TXMODE_MANUAL))
-	{
+        {
             m_uesb_mainstate = UESB_STATE_IDLE;
-	    if(m_event_handler != 0) m_event_handler();
+            if(m_event_handler != 0) m_event_handler();
         }
         else
-	{
+        {
             if(m_event_handler != 0) m_event_handler();
             start_tx_transaction();
-	}
+        }
     }
     else
     {
@@ -711,7 +711,7 @@ static void on_radio_disabled_esb_dpl_tx_wait_for_ack()
             m_interrupt_flags |= UESB_INT_TX_FAILED_MSK;
 
             m_uesb_mainstate = UESB_STATE_IDLE;
-	    if(m_event_handler != 0) m_event_handler();
+        if(m_event_handler != 0) m_event_handler();
         }
         else
         {
@@ -745,7 +745,7 @@ static void on_radio_disabled_esb_dpl_rx(void)
         // For a packet to be considered new (and not a retransmit) the PID or the CRC has to be different
         if(NRF_RADIO->RXCRC != m_last_rx_packet_crc || (m_rx_payload_buffer[1] >> 1) != m_last_rx_packet_pid)
         {
-	    if((m_uesb_mainstate == UESB_STATE_PRX_SEND_ACK_PAYLOAD) && (m_tx_fifo.count > 0))
+            if((m_uesb_mainstate == UESB_STATE_PRX_SEND_ACK_PAYLOAD) && (m_tx_fifo.count > 0))
             {
                 // It is assumed that the last ACK payload was recieved.
                 if(++m_tx_fifo.exit_point >= UESB_CORE_RX_FIFO_SIZE) m_tx_fifo.exit_point = 0;
@@ -762,18 +762,18 @@ static void on_radio_disabled_esb_dpl_rx(void)
 
         if(m_config_local.protocol == UESB_PROTOCOL_ESB_DPL)
         {
-	    if(m_tx_fifo.count > 0)
-	    {
+            if(m_tx_fifo.count > 0)
+            {
                 current_payload = m_tx_fifo.payload_ptr[m_tx_fifo.exit_point];
 
                 update_rf_payload_format(current_payload->length);
                 m_tx_payload_buffer[0] = current_payload->length;
                 memcpy(&m_tx_payload_buffer[2], current_payload->data, current_payload->length);
 
-		m_uesb_mainstate = UESB_STATE_PRX_SEND_ACK_PAYLOAD;
-	    }
+                m_uesb_mainstate = UESB_STATE_PRX_SEND_ACK_PAYLOAD;
+            }
             else
-	    {
+            {
                 update_rf_payload_format(0);
                 m_tx_payload_buffer[0] = 0;
 
