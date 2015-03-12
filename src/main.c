@@ -30,7 +30,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "uart.h"
 #include "micro_esb.h"
 #include "uesb_error_codes.h"
 #include "led.h"
@@ -38,10 +37,6 @@
 #include "pm.h"
 #include "pinout.h"
 #include "systick.h"
-#include "uart.h"
-
-#include "memory.h"
-#include "ownet.h"
 
 #include "SEGGER_RTT.h"
 
@@ -89,7 +84,7 @@ void uesb_event_handler()
     // }
     if(rf_interrupts & UESB_INT_RX_DR_MSK)
     {
-      LED_ON();
+      LED_OFF();
       uesb_read_rx_payload(&rx_payload);
       SEGGER_RTT_printf(0, "%d\n", rx_payload.rssi);
     }
@@ -102,7 +97,6 @@ void uesb_event_handler()
 int main()
 {
   systickInit();
-  memoryInit();
 
 #ifdef BLE
   ble_init();
@@ -147,7 +141,7 @@ int main()
   uesb_config.rf_channel          = 100;
   uesb_config.crc                 = UESB_CRC_16BIT; // TODO
   uesb_config.retransmit_count    = 6;
-  uesb_config.retransmit_delay    = 500;  
+  uesb_config.retransmit_delay    = 500;
   uesb_config.protocol            = UESB_PROTOCOL_ESB_DPL;
   uesb_config.bitrate             = UESB_BITRATE_2MBPS;
   uesb_config.event_handler       = uesb_event_handler;
@@ -156,7 +150,7 @@ int main()
     uesb_config.dynamic_ack_enabled = 1;
   #else // Rx
     uesb_config.dynamic_ack_enabled = 0;
-    uesb_config.payload_length      = 8;  
+    uesb_config.payload_length      = 8;
     uesb_config.mode                = UESB_MODE_PRX;
   #endif
 
@@ -187,7 +181,7 @@ void mainloop()
 
   uesb_payload_t tx_payload;
 
-  tx_payload.length  = 8;
+  tx_payload.length  = 4;
   tx_payload.pipe    = 0;
   tx_payload.data[0] = 0xCA;
   tx_payload.data[1] = 0xFE;
@@ -196,20 +190,25 @@ void mainloop()
 
   while(1)
   {
-    LED_OFF();
-    
-    #if CFMODE==1 // Tx
-      if (uesb_write_tx_payload(&tx_payload) == UESB_SUCCESS)
-      {
-        LED_ON();
-        SEGGER_RTT_printf(0, "%d\n", count);
-        ++count;
-      }
-    #else // Rx
-      {
-      }
-    #endif
-    
+    PmState state = pmGetState();
+    if (state != pmSysOff)
+    {
+      LED_ON();
+
+      #if CFMODE==1 // Tx
+        if (uesb_write_tx_payload(&tx_payload) == UESB_SUCCESS)
+        {
+          LED_OFF();
+          SEGGER_RTT_printf(0, "%d\n", count);
+          ++count;
+        }
+      #endif
+    }
+    else
+    {
+      LED_OFF();
+    }
+
     // Button event handling
     ButtonEvent be = buttonGetState();
     bool usbConnected = pmUSBPower();

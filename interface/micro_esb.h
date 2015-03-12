@@ -37,8 +37,8 @@
 #define     UESB_CORE_TX_FIFO_SIZE          8
 #define     UESB_CORE_RX_FIFO_SIZE          8
 
-#define     UESB_SYS_TIMER                  NRF_TIMER2
-#define     UESB_SYS_TIMER_IRQ_Handler      TIMER2_IRQHandler
+#define     UESB_SYS_TIMER                  NRF_TIMER1
+#define     UESB_SYS_TIMER_IRQ_Handler      TIMER1_IRQHandler
 
 #define     UESB_PPI_TIMER_START            4
 #define     UESB_PPI_TIMER_STOP             5

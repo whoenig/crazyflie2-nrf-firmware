@@ -82,9 +82,8 @@ CFLAGS += -DCFMODE=0
 endif
 
 OBJS += src/main.o gcc_startup_nrf51.o system_nrf51.o src/uart.o \
-        src/pm.o src/systick.o src/button.o src/swd.o src/ow.o \
-        src/ow/owlnk.o src/ow/ownet.o src/ow/owtran.o \
-        src/ow/crcutil.o src/ds2431.o src/ds28e05.o src/micro_esb.o src/memory.o \
+        src/pm.o src/systick.o src/button.o \
+        src/ow/crcutil.o src/micro_esb.o \
         src/SEGGER_RTT.o src/SEGGER_RTT_printf.o
 
 all: $(PROGRAM).elf $(PROGRAM).bin $(PROGRAM).hex
