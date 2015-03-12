@@ -5,6 +5,7 @@ CLOAD_SCRIPT ?= ../crazyflie-clients-python/bin/cfloader
 
 S110 ?= 1     # SoftDevice flashed or not
 BLE  ?= 1     # BLE mode activated or not. If disabled, CRTP mode is active
+CFMODE ?= 1   # Check if crazyflie mode is Tx or not.
 
 CROSS_COMPILE?=arm-none-eabi-
 
@@ -72,6 +73,12 @@ CFLAGS += -I$(NRF51_SDK)/Include/ble/ble_services/
 CFLAGS += -I$(NRF_S110)/s110_nrf51822_7.0.0_API/include
 CFLAGS += -I$(NRF51_SDK)/Include/app_common/ 
 CFLAGS += -I$(NRF51_SDK)/Include/sd_common/ 
+endif
+
+ifeq ($(strip $(CFMODE)), 1)
+CFLAGS += -DCFMODE=1
+else
+CFLAGS += -DCFMODE=0
 endif
 
 OBJS += src/main.o gcc_startup_nrf51.o system_nrf51.o src/uart.o \
