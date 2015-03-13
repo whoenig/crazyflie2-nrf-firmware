@@ -75,16 +75,18 @@ CFLAGS += -I$(NRF51_SDK)/Include/app_common/
 CFLAGS += -I$(NRF51_SDK)/Include/sd_common/ 
 endif
 
-ifeq ($(strip $(CFMODE)), 1)
-CFLAGS += -DCFMODE=1
-else
-CFLAGS += -DCFMODE=0
-endif
+CFLAGS += -DCFMODE=$(strip $(CFMODE))
 
 OBJS += src/main.o gcc_startup_nrf51.o system_nrf51.o src/uart.o \
         src/pm.o src/systick.o src/button.o \
-        src/ow/crcutil.o src/micro_esb.o \
+        src/ow/crcutil.o \
         src/SEGGER_RTT.o src/SEGGER_RTT_printf.o
+
+ifeq ($(strip $(CFMODE)), 2)
+    OBJS += src/esb.o
+else
+    OBJS += src/micro_esb.o
+endif
 
 all: $(PROGRAM).elf $(PROGRAM).bin $(PROGRAM).hex
 	$(SIZE) $(PROGRAM).elf

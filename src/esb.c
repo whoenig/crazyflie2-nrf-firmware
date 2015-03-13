@@ -122,12 +122,12 @@ static void setupTx(bool retry) {
       lastSentPacket = &txPackets[txq_tail];
     } else {
       // Send empty ACK
-#ifdef RSSI_ACK_PACKET
+//#ifdef RSSI_ACK_PACKET
       ackPacket.size = 3;
       ackPacket.data[0] = 0xff;
       ackPacket.data[1] = 0x01;
       ackPacket.data[2] = NRF_RADIO->RSSISAMPLE;
-#endif
+//#endif
       NRF_RADIO->PACKETPTR = (uint32_t)&ackPacket;
       lastSentPacket = &ackPacket;
     }

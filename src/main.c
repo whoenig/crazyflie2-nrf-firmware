@@ -30,8 +30,12 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "micro_esb.h"
-#include "uesb_error_codes.h"
+#if CFMODE == 2
+  #include "esb.h"
+#else
+  #include "micro_esb.h"
+  #include "uesb_error_codes.h"
+#endif
 #include "led.h"
 #include "button.h"
 #include "pm.h"
@@ -58,7 +62,10 @@ static void mainloop(void);
 #endif
 
 static bool boottedFromBootloader;
+
+#if CFMODE == 0 || CFMODE == 1
 static uesb_payload_t rx_payload;
+static uesb_payload_t ack_payload;
 
 void uesb_event_handler()
 {
@@ -86,13 +93,21 @@ void uesb_event_handler()
     {
       LED_OFF();
       uesb_read_rx_payload(&rx_payload);
-      SEGGER_RTT_printf(0, "%d\n", rx_payload.rssi);
+
+      ack_payload.length = 3;
+      ack_payload.data[0] = 0xff;
+      ack_payload.data[1] = 0x1;
+      ack_payload.data[2] = rx_payload.rssi;
+
+      uesb_write_ack_payload(&ack_payload);
+      //SEGGER_RTT_printf(0, "%d\n", rx_payload.rssi);
     }
 
     // uesb_get_tx_attempts(&tx_attempts);
     // NRF_GPIO->OUTCLR = 0xFUL << 12;
     // NRF_GPIO->OUTSET = (tx_attempts & 0x0F) << 12;
 }
+#endif
 
 int main()
 {
@@ -137,6 +152,11 @@ int main()
 
   NRF_GPIO->PIN_CNF[RADIO_PAEN_PIN] |= GPIO_PIN_CNF_DIR_Output | (GPIO_PIN_CNF_DRIVE_S0H1<<GPIO_PIN_CNF_DRIVE_Pos);
 
+  #if CFMODE == 2 //Bitcraze RX-mode
+    esbInit();
+    esbSetDatarate(esbDatarate2M);
+    esbSetChannel(100);
+  #else // RX or TX (u-esb lib)
   uesb_config_t uesb_config       = UESB_DEFAULT_CONFIG;
   uesb_config.rf_channel          = 100;
   uesb_config.crc                 = UESB_CRC_16BIT; // TODO
@@ -146,11 +166,8 @@ int main()
   uesb_config.bitrate             = UESB_BITRATE_2MBPS;
   uesb_config.event_handler       = uesb_event_handler;
   uesb_config.tx_output_power     = UESB_TX_POWER_NEG30DBM,
-  #if CFMODE==1 // Tx
-    uesb_config.dynamic_ack_enabled = 1;
-  #else // Rx
-    uesb_config.dynamic_ack_enabled = 0;
-    uesb_config.payload_length      = 8;
+  uesb_config.dynamic_ack_enabled = 1;
+  #if CFMODE == 0 // RX
     uesb_config.mode                = UESB_MODE_PRX;
   #endif
 
@@ -159,10 +176,11 @@ int main()
   uint8_t addr[] = {0xE7, 0xE7, 0xE7, 0xE7, 0xE7};
   uesb_set_address(UESB_ADDRESS_PIPE0, addr);
 
+  #endif
+
   SEGGER_RTT_ConfigUpBuffer(0, NULL, NULL, 0, SEGGER_RTT_MODE_NO_BLOCK_SKIP);
 
-  #if CFMODE==1 // Tx
-  #else // Rx
+  #if CFMODE == 0 // RX
     uesb_start_rx();
   #endif
 
@@ -177,6 +195,7 @@ int main()
 
 void mainloop()
 {
+#if CFMODE == 1
   int count = 0;
 
   uesb_payload_t tx_payload;
@@ -187,6 +206,7 @@ void mainloop()
   tx_payload.data[1] = 0xFE;
   tx_payload.data[2] = 0xBA;
   tx_payload.data[3] = 0xBE;
+#endif
 
   while(1)
   {
@@ -195,6 +215,13 @@ void mainloop()
     {
       LED_ON();
 
+      #if CFMODE == 2
+        if (esbIsRxPacket())
+        {
+          EsbPacket* packet = esbGetRxPacket();
+          esbReleaseRxPacket(packet);
+        }
+      #endif
       #if CFMODE==1 // Tx
         if (uesb_write_tx_payload(&tx_payload) == UESB_SUCCESS)
         {
