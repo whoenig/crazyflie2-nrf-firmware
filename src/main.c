@@ -67,6 +67,8 @@ static bool boottedFromBootloader;
 static uesb_payload_t rx_payload;
 static uesb_payload_t ack_payload;
 
+static int count;
+
 void uesb_event_handler()
 {
     static uint32_t rf_interrupts;
@@ -96,11 +98,12 @@ void uesb_event_handler()
 
       ack_payload.length = 3;
       ack_payload.data[0] = 0xff;
-      ack_payload.data[1] = 0x1;
+      ack_payload.data[1] = 0x2;
       ack_payload.data[2] = rx_payload.rssi;
 
       uesb_write_ack_payload(&ack_payload);
-      //SEGGER_RTT_printf(0, "%d\n", rx_payload.rssi);
+      SEGGER_RTT_printf(0, "%d: %d\n", count, rx_payload.rssi);
+      ++count;
     }
 
     // uesb_get_tx_attempts(&tx_attempts);
@@ -160,12 +163,12 @@ int main()
   uesb_config_t uesb_config       = UESB_DEFAULT_CONFIG;
   uesb_config.rf_channel          = 100;
   uesb_config.crc                 = UESB_CRC_16BIT; // TODO
-  uesb_config.retransmit_count    = 6;
-  uesb_config.retransmit_delay    = 500;
+  //uesb_config.retransmit_count    = 6;
+  //uesb_config.retransmit_delay    = 500;
   uesb_config.protocol            = UESB_PROTOCOL_ESB_DPL;
   uesb_config.bitrate             = UESB_BITRATE_2MBPS;
   uesb_config.event_handler       = uesb_event_handler;
-  uesb_config.tx_output_power     = UESB_TX_POWER_NEG30DBM,
+  uesb_config.tx_output_power     = UESB_TX_POWER_0DBM,
   uesb_config.dynamic_ack_enabled = 1;
   #if CFMODE == 0 // RX
     uesb_config.mode                = UESB_MODE_PRX;
