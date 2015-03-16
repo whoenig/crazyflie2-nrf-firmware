@@ -34,8 +34,8 @@
 
 // Hard coded parameters - change if necessary
 #define     UESB_CORE_MAX_PAYLOAD_LENGTH    32
-#define     UESB_CORE_TX_FIFO_SIZE          8
-#define     UESB_CORE_RX_FIFO_SIZE          8
+#define     UESB_CORE_TX_FIFO_SIZE          2
+#define     UESB_CORE_RX_FIFO_SIZE          2
 
 #define     UESB_SYS_TIMER                  NRF_TIMER1
 #define     UESB_SYS_TIMER_IRQ_Handler      TIMER1_IRQHandler

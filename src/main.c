@@ -42,6 +42,8 @@
 #include "pinout.h"
 #include "systick.h"
 
+#include "nrf_gpio.h"
+
 #include "SEGGER_RTT.h"
 
 #ifdef BLE
@@ -66,8 +68,11 @@ static bool boottedFromBootloader;
 #if CFMODE == 0 || CFMODE == 1
 static uesb_payload_t rx_payload;
 static uesb_payload_t ack_payload;
+static uint8_t channel;
 
 static int count;
+
+static int channelSwitchAckTime;
 
 void uesb_event_handler()
 {
@@ -96,14 +101,27 @@ void uesb_event_handler()
       LED_OFF();
       uesb_read_rx_payload(&rx_payload);
 
+      count = rx_payload.data[1];
+
       ack_payload.length = 3;
-      ack_payload.data[0] = 0xff;
-      ack_payload.data[1] = 0x2;
+      ack_payload.data[0] = channel;
+      ack_payload.data[1] = count;
       ack_payload.data[2] = rx_payload.rssi;
 
       uesb_write_ack_payload(&ack_payload);
-      SEGGER_RTT_printf(0, "%d: %d\n", count, rx_payload.rssi);
-      ++count;
+      //SEGGER_RTT_printf(0, "%d, %d, %d\n", channel, count, rx_payload.rssi);
+      // char bla[10];
+      // itoa(count, bla, 10);
+      // int len = strlen(bla);
+      // bla[len] = '\n';
+      // bla[len+1] = '\0';
+      // SEGGER_RTT_Write(0, (const char*)&count, sizeof(count));
+      // SEGGER_RTT_Write(0, "\n", 1);
+      //++count;
+      if (count == 20)
+      {
+        channelSwitchAckTime = systickGetTick();
+      }
     }
 
     // uesb_get_tx_attempts(&tx_attempts);
@@ -160,13 +178,14 @@ int main()
     esbSetDatarate(esbDatarate2M);
     esbSetChannel(100);
   #else // RX or TX (u-esb lib)
+  channel = 100;
   uesb_config_t uesb_config       = UESB_DEFAULT_CONFIG;
   uesb_config.rf_channel          = 100;
   uesb_config.crc                 = UESB_CRC_16BIT; // TODO
   //uesb_config.retransmit_count    = 6;
   //uesb_config.retransmit_delay    = 500;
   uesb_config.protocol            = UESB_PROTOCOL_ESB_DPL;
-  uesb_config.bitrate             = UESB_BITRATE_2MBPS;
+  uesb_config.bitrate             = UESB_BITRATE_250KBPS;
   uesb_config.event_handler       = uesb_event_handler;
   uesb_config.tx_output_power     = UESB_TX_POWER_0DBM,
   uesb_config.dynamic_ack_enabled = 1;
@@ -211,12 +230,15 @@ void mainloop()
   tx_payload.data[3] = 0xBE;
 #endif
 
+  nrf_gpio_cfg_output(RADIO_PAEN_PIN);
+
   while(1)
   {
     PmState state = pmGetState();
     if (state != pmSysOff)
     {
       LED_ON();
+      nrf_gpio_pin_set(RADIO_PAEN_PIN);
 
       #if CFMODE == 2
         if (esbIsRxPacket())
@@ -232,6 +254,25 @@ void mainloop()
           SEGGER_RTT_printf(0, "%d\n", count);
           ++count;
         }
+      #endif
+
+      #if CFMODE==0 // Rx
+      // switch channel 10ms after we ACK'ed the 20th packet
+      if (count == 20 && systickGetTick() >= channelSwitchAckTime + 20)
+      {
+        channel += 1;
+        if (channel > 125) {
+          channel = 0;
+        }
+        uesb_stop_rx();
+        uesb_flush_rx();
+        uesb_flush_tx();
+        uesb_set_rf_channel(channel);
+        uesb_start_rx();
+        SEGGER_RTT_printf(0, "Update Channel: %d\n", channel);
+        count = 0;
+      }
+
       #endif
     }
     else

@@ -172,6 +172,8 @@ static void update_radio_parameters()
     NRF_RADIO->PREFIX1 = bytewise_bit_swap(m_config_local.rx_address_p7 << 24 | m_config_local.rx_address_p6 << 16 | m_config_local.rx_address_p5 << 8 | m_config_local.rx_address_p4);
     NRF_RADIO->BASE0   = bytewise_bit_swap(m_config_local.rx_address_p0[1] << 24 | m_config_local.rx_address_p0[2] << 16 | m_config_local.rx_address_p0[3] << 8 | m_config_local.rx_address_p0[4]);
     NRF_RADIO->BASE1   = bytewise_bit_swap(m_config_local.rx_address_p1[1] << 24 | m_config_local.rx_address_p1[2] << 16 | m_config_local.rx_address_p1[3] << 8 | m_config_local.rx_address_p1[4]);
+
+    NRF_RADIO->FREQUENCY = m_config_local.rf_channel;
 }
 
 static void initialize_fifos()
@@ -353,7 +355,7 @@ static void start_tx_transaction()
     NRF_RADIO->TXADDRESS = current_payload->pipe;
     NRF_RADIO->RXADDRESSES = 1 << current_payload->pipe;
 
-    NRF_RADIO->FREQUENCY = m_config_local.rf_channel;
+    //NRF_RADIO->FREQUENCY = m_config_local.rf_channel;
 
     NRF_RADIO->PACKETPTR = (uint32_t)m_tx_payload_buffer;
 
@@ -472,7 +474,7 @@ uint32_t uesb_start_rx(void)
 
     NRF_RADIO->RXADDRESSES = m_config_local.rx_pipes_enabled;
 
-    NRF_RADIO->FREQUENCY = m_config_local.rf_channel;
+    //NRF_RADIO->FREQUENCY = m_config_local.rf_channel;
 
     NRF_RADIO->PACKETPTR = (uint32_t)m_rx_payload_buffer;
 
@@ -574,7 +576,9 @@ uint32_t uesb_set_address(uesb_address_type_t address, const uint8_t *data_ptr)
 uint32_t uesb_set_rf_channel(uint32_t channel)
 {
     if(channel > 125) return UESB_ERROR_INVALID_PARAMETERS;
+    if (m_config_local.rf_channel == channel) return UESB_SUCCESS;
     m_config_local.rf_channel = channel;
+    update_radio_parameters();
     return UESB_SUCCESS;
 }
 
@@ -785,6 +789,13 @@ static void on_radio_disabled_esb_dpl_rx(void)
             set_rx_interrupt = true;
             m_last_rx_packet_pid = m_rx_payload_buffer[1] >> 1;
             m_last_rx_packet_crc = NRF_RADIO->RXCRC;
+
+            if(set_rx_interrupt)
+            {
+                rx_fifo_push_rfbuf(NRF_RADIO->RXMATCH);
+                m_interrupt_flags |= UESB_INT_RX_DR_MSK;
+                if(m_event_handler != 0) m_event_handler();
+            }
         }
 
         if(m_config_local.protocol == UESB_PROTOCOL_ESB_DPL)
@@ -833,12 +844,12 @@ static void on_radio_disabled_esb_dpl_rx(void)
         NRF_RADIO->SHORTS = RADIO_SHORTS_COMMON | RADIO_SHORTS_DISABLED_TXEN_Msk;
         NRF_RADIO->TASKS_RXEN = 1;
     }
-    if(set_rx_interrupt)
-    {
-        rx_fifo_push_rfbuf(NRF_RADIO->RXMATCH);
-        m_interrupt_flags |= UESB_INT_RX_DR_MSK;
-        if(m_event_handler != 0) m_event_handler();
-    }
+    // if(set_rx_interrupt)
+    // {
+    //     rx_fifo_push_rfbuf(NRF_RADIO->RXMATCH);
+    //     m_interrupt_flags |= UESB_INT_RX_DR_MSK;
+    //     if(m_event_handler != 0) m_event_handler();
+    // }
 }
 
 static void on_radio_disabled_esb_dpl_rx_ack(void)
