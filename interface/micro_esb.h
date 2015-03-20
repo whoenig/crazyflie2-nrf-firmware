@@ -237,4 +237,6 @@ uint32_t uesb_set_rf_channel(uint32_t channel);
 
 uint32_t uesb_set_tx_power(uesb_tx_power_t tx_output_power);
 
+uint32_t uesb_set_bitrate(uesb_bitrate_t bitrate);
+
 #endif

@@ -591,6 +591,15 @@ uint32_t uesb_set_tx_power(uesb_tx_power_t tx_output_power)
     return UESB_SUCCESS;
 }
 
+uint32_t uesb_set_bitrate(uesb_bitrate_t bitrate)
+{
+    if(m_uesb_mainstate != UESB_STATE_IDLE) return UESB_ERROR_NOT_IDLE;
+    if ( m_config_local.bitrate == bitrate ) return UESB_SUCCESS;
+    m_config_local.bitrate = bitrate;
+    update_radio_parameters();
+    return UESB_SUCCESS;
+}
+
 void RADIO_IRQHandler()
 {
     if(NRF_RADIO->EVENTS_READY && (NRF_RADIO->INTENSET & RADIO_INTENSET_READY_Msk))
@@ -790,12 +799,12 @@ static void on_radio_disabled_esb_dpl_rx(void)
             m_last_rx_packet_pid = m_rx_payload_buffer[1] >> 1;
             m_last_rx_packet_crc = NRF_RADIO->RXCRC;
 
-            if(set_rx_interrupt)
-            {
-                rx_fifo_push_rfbuf(NRF_RADIO->RXMATCH);
-                m_interrupt_flags |= UESB_INT_RX_DR_MSK;
-                if(m_event_handler != 0) m_event_handler();
-            }
+            // if(set_rx_interrupt)
+            // {
+            //     rx_fifo_push_rfbuf(NRF_RADIO->RXMATCH);
+            //     m_interrupt_flags |= UESB_INT_RX_DR_MSK;
+            //     if(m_event_handler != 0) m_event_handler();
+            // }
         }
 
         if(m_config_local.protocol == UESB_PROTOCOL_ESB_DPL)
@@ -844,12 +853,12 @@ static void on_radio_disabled_esb_dpl_rx(void)
         NRF_RADIO->SHORTS = RADIO_SHORTS_COMMON | RADIO_SHORTS_DISABLED_TXEN_Msk;
         NRF_RADIO->TASKS_RXEN = 1;
     }
-    // if(set_rx_interrupt)
-    // {
-    //     rx_fifo_push_rfbuf(NRF_RADIO->RXMATCH);
-    //     m_interrupt_flags |= UESB_INT_RX_DR_MSK;
-    //     if(m_event_handler != 0) m_event_handler();
-    // }
+    if(set_rx_interrupt)
+    {
+        rx_fifo_push_rfbuf(NRF_RADIO->RXMATCH);
+        m_interrupt_flags |= UESB_INT_RX_DR_MSK;
+        if(m_event_handler != 0) m_event_handler();
+    }
 }
 
 static void on_radio_disabled_esb_dpl_rx_ack(void)

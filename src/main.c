@@ -69,6 +69,7 @@ static bool boottedFromBootloader;
 static uesb_payload_t rx_payload;
 static uesb_payload_t ack_payload;
 static uint8_t channel;
+static uesb_bitrate_t bitrate = UESB_BITRATE_250KBPS;
 
 static int count;
 
@@ -109,7 +110,9 @@ void uesb_event_handler()
       ack_payload.data[2] = rx_payload.rssi;
 
       uesb_write_ack_payload(&ack_payload);
-      //SEGGER_RTT_printf(0, "%d, %d, %d\n", channel, count, rx_payload.rssi);
+      SEGGER_RTT_Write(0, (const char*)&ack_payload.data[0], 3);
+
+      // SEGGER_RTT_printf(0, "%d,%d\n", channel, rx_payload.rssi);
       // char bla[10];
       // itoa(count, bla, 10);
       // int len = strlen(bla);
@@ -268,8 +271,24 @@ void mainloop()
         uesb_flush_rx();
         uesb_flush_tx();
         uesb_set_rf_channel(channel);
+        if (channel == 100) {
+          switch (bitrate)
+          {
+            case UESB_BITRATE_250KBPS:
+              bitrate = UESB_BITRATE_1MBPS;
+              break;
+            case UESB_BITRATE_1MBPS:
+              bitrate = UESB_BITRATE_2MBPS;
+              break;
+            case UESB_BITRATE_2MBPS:
+              bitrate = UESB_BITRATE_250KBPS;
+              break;
+          }
+          uesb_set_bitrate(bitrate);
+        }
+
         uesb_start_rx();
-        SEGGER_RTT_printf(0, "Update Channel: %d\n", channel);
+        //SEGGER_RTT_printf(0, "Update Channel: %d\n", channel);
         count = 0;
       }
 
