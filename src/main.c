@@ -181,9 +181,9 @@ int main()
     esbSetDatarate(esbDatarate2M);
     esbSetChannel(100);
   #else // RX or TX (u-esb lib)
-  channel = 100;
+  channel = 0;
   uesb_config_t uesb_config       = UESB_DEFAULT_CONFIG;
-  uesb_config.rf_channel          = 100;
+  uesb_config.rf_channel          = channel;
   uesb_config.crc                 = UESB_CRC_16BIT; // TODO
   //uesb_config.retransmit_count    = 6;
   //uesb_config.retransmit_delay    = 500;
@@ -264,14 +264,13 @@ void mainloop()
       if (count == 20 && systickGetTick() >= channelSwitchAckTime + 20)
       {
         channel += 1;
-        if (channel > 125) {
-          channel = 0;
-        }
+        // if (channel > 125) {
+          // channel = 0;
+        // }
         uesb_stop_rx();
         uesb_flush_rx();
         uesb_flush_tx();
-        uesb_set_rf_channel(channel);
-        if (channel == 100) {
+        if (channel == 126) {
           switch (bitrate)
           {
             case UESB_BITRATE_250KBPS:
@@ -285,8 +284,9 @@ void mainloop()
               break;
           }
           uesb_set_bitrate(bitrate);
+          channel = 0;
         }
-
+        uesb_set_rf_channel(channel);
         uesb_start_rx();
         //SEGGER_RTT_printf(0, "Update Channel: %d\n", channel);
         count = 0;
