@@ -174,15 +174,36 @@ void uesb_event_handler()
 #endif
 
 #if CFMODE == 2
+static unsigned int channel;
+static int count = 0;
+static int channelSwitchAckTime;
+static EsbDatarate datarate;
 void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
 {
-  int i;
-  ack->size = received->size;
-  for (i = 0; i< ack->size; ++i) {
-    ack->data[i] = received->data[i];
+  // int i;
+  count = received->data[1];
+
+  ack->size = 3;
+  ack->data[0] = channel;
+  ack->data[1] = count;
+  ack->data[2] = received->rssi;
+  SEGGER_RTT_Write(0, (const char*)&(ack->data[0]), 3);
+  // SEGGER_RTT_printf(0, "R");
+
+  if (count == 20)// && channel == rx_payload.data[0])
+  {
+    // SEGGER_RTT_printf(0, "%d,%d,%d\n", channel, count, received->rssi);
+    // SEGGER_RTT_printf(0, "CSAT");
+    channelSwitchAckTime = systickGetTick();
   }
-  SEGGER_RTT_printf(0, "R");
+
 }
+#endif
+
+#if CFMODE == 3
+static unsigned int channel;
+static int count = 0;
+static EsbDatarate datarate;
 #endif
 
 int main()
@@ -229,9 +250,13 @@ int main()
   NRF_GPIO->PIN_CNF[RADIO_PAEN_PIN] |= GPIO_PIN_CNF_DIR_Output | (GPIO_PIN_CNF_DRIVE_S0H1<<GPIO_PIN_CNF_DRIVE_Pos);
 
   #if CFMODE == 2 || CFMODE == 3 //Bitcraze RX-mode & Bitcraze TX Mode
+    channel = 0;
+    count = 0;
+    datarate = esbDatarate250K;
+
+    esbSetDatarate(datarate);
+    esbSetChannel(channel);
     esbInit();
-    esbSetDatarate(esbDatarate2M);
-    esbSetChannel(100);
   #else // RX or TX (u-esb lib)
   channel = 100;
   uesb_config_t uesb_config       = UESB_DEFAULT_CONFIG;
@@ -275,6 +300,12 @@ int main()
   return 0;
 }
 
+void delayms(int delay)
+{
+  int starttime = systickGetTick();
+  while (systickGetTick() < starttime + delay);
+}
+
 void mainloop()
 {
 #if CFMODE == 1
@@ -307,6 +338,35 @@ void mainloop()
       nrf_gpio_pin_set(RADIO_PAEN_PIN);
 
       #if CFMODE == 2 // Bitcraze RX Mode
+        if (count == 20 && systickGetTick() >= channelSwitchAckTime + 50)
+        {
+          count = 0;
+          channel += 1;
+          if (channel == 126) {
+            switch (datarate)
+            {
+              case esbDatarate250K:
+                datarate = esbDatarate1M;
+                break;
+              case esbDatarate1M:
+                datarate = esbDatarate2M;
+                break;
+              case esbDatarate2M:
+                datarate = esbDatarate250K;
+                break;
+            }
+            esbSetDatarate(datarate);
+            channel = 0;
+          }
+          // esbReset();
+          // esbStartRx();
+          esbStopRx();
+          // delayms(250);
+          esbSetChannel(channel);
+          // delayms(250);
+          esbStartRx();
+          // SEGGER_RTT_printf(0, "Channel: %d\n", channel);
+        }
         //if (esbIsRxPacket())
         //{
         //  EsbPacket* packet = esbGetRxPacket();
@@ -315,16 +375,47 @@ void mainloop()
       #endif
       #if CFMODE == 3 // Bitcraze TX Mode
         packet.pid = (packet.pid + 1) % 4;
-        packet.data[0]++;
+        packet.size = 16;
+        packet.data[0] = channel;
+        packet.data[1] = count;
         ack = esbSendPacket(&packet);
-        if (ack)
+        if (ack && ack->size)
         {
-          SEGGER_RTT_printf(0, "%d\n", ack->data[1]);
+          if (ack->data[1] == count)
+          {
+            if (count == 20)
+            {
+              channel = ack->data[0] + 1;
+              if (channel == 126) {
+                switch (datarate)
+                {
+                  case esbDatarate250K:
+                    datarate = esbDatarate1M;
+                    break;
+                  case esbDatarate1M:
+                    datarate = esbDatarate2M;
+                    break;
+                  case esbDatarate2M:
+                    datarate = esbDatarate250K;
+                    break;
+                }
+                esbSetDatarate(datarate);
+                channel = 0;
+              }
+              esbSetChannel(channel);
+              count = 0;
+            }
+            else
+            {
+              count += 1;
+            }
+          }
+          //SEGGER_RTT_printf(0, "%d\n", ack->data[1]);
         }
-        else
-        {
-          SEGGER_RTT_printf(0, "-");
-        }
+        // else
+        // {
+        //   SEGGER_RTT_printf(0, "-");
+        // }
       #endif
       #if CFMODE==1 // Tx
         tx_payload.data[0] = channel;

@@ -70,6 +70,7 @@ typedef void (*esbPacketReceivedHandler_t)(EsbPacket* received, EsbPacket* ack);
 void esbSetPacketReceivedHandler(esbPacketReceivedHandler_t handler);
 
 void esbStartRx();
+void esbStopRx();
 
 EsbPacket* esbSendPacket(EsbPacket* packet);
 

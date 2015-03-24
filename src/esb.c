@@ -42,7 +42,7 @@ static void esbInterruptHandler();
 
 static bool isInit = true;
 
-static int channel = 2;
+static unsigned int channel = 2;
 static int datarate = esbDatarate2M;
 static int txpower = RADIO_TXPOWER_TXPOWER_0dBm;
 static bool contwave = false;
@@ -147,7 +147,7 @@ void esbInterruptHandler()
   if (NRF_RADIO->EVENTS_END) {
     NRF_RADIO->EVENTS_END = 0UL;
 
-    SEGGER_RTT_printf(0, "B");
+    // SEGGER_RTT_printf(0, "B");
 
     switch (rs){
     case doNothing:
@@ -181,7 +181,7 @@ void esbInterruptHandler()
       setupRx();
       break;
     case doPtxTx:
-      SEGGER_RTT_printf(0, "T");
+      // SEGGER_RTT_printf(0, "T");
       NRF_RADIO->PACKETPTR = (uint32_t)&recvPacket;
       // switch to receive ack after task is disabled
       // NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_TXEN_Msk;
@@ -191,7 +191,7 @@ void esbInterruptHandler()
       // NRF_RADIO->TASKS_DISABLE = 1UL;
       break;
     case doPtxAck:
-      SEGGER_RTT_printf(0, "R");
+      // SEGGER_RTT_printf(0, "R");
       rs = doNothing;
       //Wrong CRC packet are dropped
       if (!NRF_RADIO->CRCSTATUS) {
@@ -199,7 +199,7 @@ void esbInterruptHandler()
         return;
       }
       // disable radio (and make sure no short triggers another RX or Tx)
-      NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
+      NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_TXEN_Msk;
       NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
       NRF_RADIO->TASKS_DISABLE = 1UL;
       receivedAck = true;
@@ -293,7 +293,7 @@ void esbInit()
   NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
   NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_TXEN_Msk;
   NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RSSISTOP_Enabled;
-  NRF_RADIO->SHORTS |= RADIO_SHORTS_END_DISABLE_Msk;
+  // NRF_RADIO->SHORTS |= RADIO_SHORTS_END_DISABLE_Msk;
 
   // Set RX buffer and start RX
   rs = doNothing;
@@ -305,11 +305,17 @@ void esbInit()
 
 void esbReset()
 {
+  // esbDeinit();
+  // esbInit();
   if (!isInit) return;
 #ifndef BLE
   __disable_irq();
 #endif
+  NRF_RADIO->SHORTS = 0;
+  NRF_RADIO->INTENCLR = 0xFFFFFFFF;
+  NRF_RADIO->EVENTS_DISABLED = 0;
   NRF_RADIO->TASKS_DISABLE = 1;
+  while(NRF_RADIO->EVENTS_DISABLED == 0U);
   NRF_RADIO->POWER = 0;
 
   NVIC_GetPendingIRQ(RADIO_IRQn);
@@ -340,7 +346,20 @@ void esbStartRx()
 {
   rs = doRx;
   NRF_RADIO->PACKETPTR = (uint32_t)&recvPacket;
+  NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_TXEN_Msk;
+  NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
   NRF_RADIO->TASKS_RXEN = 1U;
+}
+
+void esbStopRx()
+{
+  rs = doNothing;
+  NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_TXEN_Msk;
+  NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
+  // NRF_RADIO->SHORTS &= ~RADIO_SHORTS_END_DISABLE_Msk;
+  NRF_RADIO->EVENTS_DISABLED = 0;
+  NRF_RADIO->TASKS_DISABLE = 1;
+  while(NRF_RADIO->EVENTS_DISABLED == 0);
 }
 
 EsbPacket* esbSendPacket(EsbPacket* packet)
@@ -368,6 +387,7 @@ EsbPacket* esbSendPacket(EsbPacket* packet)
   // NRF_RADIO->PACKETPTR = (uint32_t)packet;
   // After being disabled the radio will automatically receive
   NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RXEN_Msk;
+  NRF_RADIO->SHORTS |= RADIO_SHORTS_END_DISABLE_Msk;
   NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_TXEN_Msk;
   rs = doPtxTx;
   // NRF_RADIO->TASKS_RXEN = 1U;
@@ -376,15 +396,16 @@ EsbPacket* esbSendPacket(EsbPacket* packet)
 
   // SEGGER_RTT_printf(0, "%d\n", NRF_RADIO->STATE);
 
-  // wait 100ms max
-  while (startTime + 100 >= systickGetTick()) {
+  // wait 10ms max
+  while (startTime + 10 >= systickGetTick()) {
     if (receivedAck) {
       return &recvPacket;
     }
   }
 
+  NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_TXEN_Msk;
   NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
-  NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
+  NRF_RADIO->SHORTS &= ~RADIO_SHORTS_END_DISABLE_Msk;
   NRF_RADIO->TASKS_DISABLE = 1UL;
   return NULL;
 }
@@ -442,8 +463,10 @@ void esbSetContwave(bool enable)
 
 void esbSetChannel(unsigned int ch)
 {
-  if (channel < 126) {
+  if (ch < 126) {
     channel = ch;
+    // NRF_RADIO->FREQUENCY = channel;
+    // esbReset();
   }
 
   esbReset();
