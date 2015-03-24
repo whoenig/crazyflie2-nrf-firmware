@@ -65,25 +65,13 @@ void esbInit();
 /* Stop ESB and free the radio */
 void esbDeinit();
 
-void esbInterruptHandler();
+typedef void (*esbPacketReceivedHandler_t)(EsbPacket* received, EsbPacket* ack);
 
-/* Return true is a packet has been received and is ready to read */
-bool esbIsRxPacket();
+void esbSetPacketReceivedHandler(esbPacketReceivedHandler_t handler);
 
-/* Return the packet received of NULL if none*/
-EsbPacket * esbGetRxPacket();
+void esbStartRx();
 
-/* Release the RX packet so that it can be used again by the radio */
-void esbReleaseRxPacket();
-
-/* Return true if a packet can be pushed in the TX queue */
-bool esbCanTxPacket();
-
-/* Return the address of the next TX packet in the TX queue */
-EsbPacket * esbGetTxPacket();
-
-/* Release and set for sending the buffer returned by getTxPacket */
-void esbSendTxPacket();
+EsbPacket* esbSendPacket(EsbPacket* packet);
 
 /* Set datarate */
 void esbSetDatarate(EsbDatarate datarate);

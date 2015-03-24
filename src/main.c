@@ -30,7 +30,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#if CFMODE == 2
+#if CFMODE == 2 || CFMODE == 3
   #include "esb.h"
 #else
   #include "micro_esb.h"
@@ -173,6 +173,18 @@ void uesb_event_handler()
 }
 #endif
 
+#if CFMODE == 2
+void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
+{
+  int i;
+  ack->size = received->size;
+  for (i = 0; i< ack->size; ++i) {
+    ack->data[i] = received->data[i];
+  }
+  SEGGER_RTT_printf(0, "R");
+}
+#endif
+
 int main()
 {
   systickInit();
@@ -216,7 +228,7 @@ int main()
 
   NRF_GPIO->PIN_CNF[RADIO_PAEN_PIN] |= GPIO_PIN_CNF_DIR_Output | (GPIO_PIN_CNF_DRIVE_S0H1<<GPIO_PIN_CNF_DRIVE_Pos);
 
-  #if CFMODE == 2 //Bitcraze RX-mode
+  #if CFMODE == 2 || CFMODE == 3 //Bitcraze RX-mode & Bitcraze TX Mode
     esbInit();
     esbSetDatarate(esbDatarate2M);
     esbSetChannel(100);
@@ -249,6 +261,11 @@ int main()
     uesb_start_rx();
   #endif
 
+  #if CFMODE == 2 // Bitcraze RX Mode
+    esbSetPacketReceivedHandler(packetReceivedHandler);
+    esbStartRx();
+  #endif
+
   mainloop();
 
   // The main loop should never end
@@ -271,6 +288,14 @@ void mainloop()
   tx_payload.data[3] = 0xBE;
 #endif
 
+#if CFMODE == 3
+  EsbPacket packet;
+  EsbPacket* ack;
+  packet.data[0] = 0xCA;
+  packet.data[1] = 0xFE;
+  packet.size = 1;
+#endif
+
   nrf_gpio_cfg_output(RADIO_PAEN_PIN);
 
   while(1)
@@ -281,11 +306,24 @@ void mainloop()
       LED_ON();
       nrf_gpio_pin_set(RADIO_PAEN_PIN);
 
-      #if CFMODE == 2
-        if (esbIsRxPacket())
+      #if CFMODE == 2 // Bitcraze RX Mode
+        //if (esbIsRxPacket())
+        //{
+        //  EsbPacket* packet = esbGetRxPacket();
+        //  esbReleaseRxPacket(packet);
+        //}
+      #endif
+      #if CFMODE == 3 // Bitcraze TX Mode
+        packet.pid = (packet.pid + 1) % 4;
+        packet.data[0]++;
+        ack = esbSendPacket(&packet);
+        if (ack)
         {
-          EsbPacket* packet = esbGetRxPacket();
-          esbReleaseRxPacket(packet);
+          SEGGER_RTT_printf(0, "%d\n", ack->data[1]);
+        }
+        else
+        {
+          SEGGER_RTT_printf(0, "-");
         }
       #endif
       #if CFMODE==1 // Tx

@@ -82,7 +82,8 @@ OBJS += src/main.o gcc_startup_nrf51.o system_nrf51.o src/uart.o \
         src/ow/crcutil.o \
         src/SEGGER_RTT.o src/SEGGER_RTT_printf.o
 
-ifeq ($(strip $(CFMODE)), 2)
+# mode 2 or 3 qualify for esb
+ifeq ($(CFMODE),$(filter $(CFMODE),2 3))
     OBJS += src/esb.o
 else
     OBJS += src/micro_esb.o
