@@ -178,6 +178,7 @@ static unsigned int channel;
 static int count = 0;
 static int channelSwitchAckTime;
 static EsbDatarate datarate;
+static int txpower;
 void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
 {
   // int i;
@@ -204,6 +205,7 @@ void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
 static unsigned int channel;
 static int count = 0;
 static EsbDatarate datarate;
+static int txpower;
 #endif
 
 int main()
@@ -256,6 +258,7 @@ int main()
 
     esbSetDatarate(datarate);
     esbSetChannel(channel);
+    esbSetTxPower(txpower);
     esbInit();
   #else // RX or TX (u-esb lib)
   channel = 100;
@@ -343,19 +346,59 @@ void mainloop()
           count = 0;
           channel += 1;
           if (channel == 126) {
-            switch (datarate)
+            // switch (datarate)
+            // {
+            //   case esbDatarate250K:
+            //     datarate = esbDatarate1M;
+            //     break;
+            //   case esbDatarate1M:
+            //     datarate = esbDatarate2M;
+            //     break;
+            //   case esbDatarate2M:
+            //     datarate = esbDatarate250K;
+            //     switch(txpower)
+            //     {
+            //     case RADIO_TXPOWER_TXPOWER_Pos4dBm:
+            //       txpower = RADIO_TXPOWER_TXPOWER_0dBm;
+            //       break;
+            //     case RADIO_TXPOWER_TXPOWER_0dBm:
+            //       txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm;
+            //       break;
+            //     }
+            //     esbSetTxPower(txpower);
+            //     break;
+            // }
+            // esbSetDatarate(datarate);
+
+            switch(txpower)
             {
-              case esbDatarate250K:
-                datarate = esbDatarate1M;
-                break;
-              case esbDatarate1M:
-                datarate = esbDatarate2M;
-                break;
-              case esbDatarate2M:
-                datarate = esbDatarate250K;
-                break;
+            case RADIO_TXPOWER_TXPOWER_Pos4dBm:
+              txpower = RADIO_TXPOWER_TXPOWER_0dBm;
+              break;
+            case RADIO_TXPOWER_TXPOWER_0dBm:
+              txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm;
+              break;
+            case RADIO_TXPOWER_TXPOWER_Neg4dBm:
+              txpower = RADIO_TXPOWER_TXPOWER_Neg8dBm;
+              break;
+            case RADIO_TXPOWER_TXPOWER_Neg8dBm:
+              txpower = RADIO_TXPOWER_TXPOWER_Neg12dBm;
+              break;
+            case RADIO_TXPOWER_TXPOWER_Neg12dBm:
+              txpower = RADIO_TXPOWER_TXPOWER_Neg16dBm;
+              break;
+            case RADIO_TXPOWER_TXPOWER_Neg16dBm:
+              txpower = RADIO_TXPOWER_TXPOWER_Neg20dBm;
+              break;
+            case RADIO_TXPOWER_TXPOWER_Neg20dBm:
+              txpower = RADIO_TXPOWER_TXPOWER_Neg30dBm;
+              break;
+            case RADIO_TXPOWER_TXPOWER_Neg30dBm:
+              txpower = RADIO_TXPOWER_TXPOWER_Pos4dBm;
+              break;
             }
-            esbSetDatarate(datarate);
+            esbSetTxPower(txpower);
+
             channel = 0;
           }
           // esbReset();
@@ -387,19 +430,49 @@ void mainloop()
             {
               channel = ack->data[0] + 1;
               if (channel == 126) {
-                switch (datarate)
+                // switch (datarate)
+                // {
+                //   case esbDatarate250K:
+                //     datarate = esbDatarate1M;
+                //     break;
+                //   case esbDatarate1M:
+                //     datarate = esbDatarate2M;
+                //     break;
+                //   case esbDatarate2M:
+                //     datarate = esbDatarate250K;
+                //     break;
+                // }
+                // esbSetDatarate(datarate);
+
+                switch(txpower)
                 {
-                  case esbDatarate250K:
-                    datarate = esbDatarate1M;
-                    break;
-                  case esbDatarate1M:
-                    datarate = esbDatarate2M;
-                    break;
-                  case esbDatarate2M:
-                    datarate = esbDatarate250K;
-                    break;
+                case RADIO_TXPOWER_TXPOWER_Pos4dBm:
+                  txpower = RADIO_TXPOWER_TXPOWER_0dBm;
+                  break;
+                case RADIO_TXPOWER_TXPOWER_0dBm:
+                  txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm;
+                  break;
+                case RADIO_TXPOWER_TXPOWER_Neg4dBm:
+                  txpower = RADIO_TXPOWER_TXPOWER_Neg8dBm;
+                  break;
+                case RADIO_TXPOWER_TXPOWER_Neg8dBm:
+                  txpower = RADIO_TXPOWER_TXPOWER_Neg12dBm;
+                  break;
+                case RADIO_TXPOWER_TXPOWER_Neg12dBm:
+                  txpower = RADIO_TXPOWER_TXPOWER_Neg16dBm;
+                  break;
+                case RADIO_TXPOWER_TXPOWER_Neg16dBm:
+                  txpower = RADIO_TXPOWER_TXPOWER_Neg20dBm;
+                  break;
+                case RADIO_TXPOWER_TXPOWER_Neg20dBm:
+                  txpower = RADIO_TXPOWER_TXPOWER_Neg30dBm;
+                  break;
+                case RADIO_TXPOWER_TXPOWER_Neg30dBm:
+                  txpower = RADIO_TXPOWER_TXPOWER_Pos4dBm;
+                  break;
                 }
-                esbSetDatarate(datarate);
+                esbSetTxPower(txpower);
+
                 channel = 0;
               }
               esbSetChannel(channel);
