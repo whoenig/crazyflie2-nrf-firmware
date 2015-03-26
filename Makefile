@@ -4,7 +4,6 @@
 CLOAD_SCRIPT ?= ../crazyflie-clients-python/bin/cfloader
 
 S110 ?= 1     # SoftDevice flashed or not
-BLE  ?= 0     # BLE mode activated or not. If disabled, CRTP mode is active
 CFMODE ?= RX  # RX or TX
 
 CROSS_COMPILE?=arm-none-eabi-
@@ -50,31 +49,6 @@ else
 LDFLAGS += -T gcc_nrf51_blank_xxaa.ld
 endif
 
-ifeq ($(strip $(BLE)), 1)
-CFLAGS += -DBLE=1
-
-OBJS += src/ble/ble.o
-OBJS += src/ble/ble_crazyflies.o
-OBJS += src/ble/timeslot.o
-
-OBJS += $(NRF51_SDK)/Source/ble/ble_advdata.o
-OBJS += $(NRF51_SDK)/Source/ble/ble_conn_params.o
-OBJS += $(NRF51_SDK)/Source/ble/ble_services/ble_srv_common.o
-OBJS += $(NRF51_SDK)/Source/ble/ble_services/ble_dis.o
-OBJS += $(NRF51_SDK)/Source/sd_common/softdevice_handler.o
-OBJS += $(NRF51_SDK)/Source/app_common/app_timer.o
-
-
-CFLAGS += -DBLE_STACK_SUPPORT_REQD -DNRF51
-CFLAGS += -I$(NRF51_SDK)/Include/gcc
-CFLAGS += -I$(NRF51_SDK)/Include/
-CFLAGS += -I$(NRF51_SDK)/Include/ble/
-CFLAGS += -I$(NRF51_SDK)/Include/ble/ble_services/
-CFLAGS += -I$(NRF_S110)/s110_nrf51822_7.0.0_API/include
-CFLAGS += -I$(NRF51_SDK)/Include/app_common/
-CFLAGS += -I$(NRF51_SDK)/Include/sd_common/
-endif
-
 CFLAGS += -DCFMODE=CFMODE_$(strip $(CFMODE))
 
 OBJS += src/main.o gcc_startup_nrf51.o system_nrf51.o src/uart.o \
@@ -89,11 +63,6 @@ ifeq ($(strip $(S110)),1)
 	@echo "S110 Activated"
 else
 	@echo "S110 Disabled"
-endif
-ifeq ($(strip $(BLE)),1)
-	@echo "BLE  Activated"
-else
-	@echo "BLE  Disabled"
 endif
 
 $(PROGRAM).hex: $(PROGRAM).elf

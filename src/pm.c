@@ -25,9 +25,6 @@
 
 #include <nrf.h>
 #include <nrf_gpio.h>
-#ifdef BLE
-#include <nrf_soc.h>
-#endif
 
 #include "pm.h"
 #include "button.h"
@@ -105,11 +102,9 @@ static void pmNrfPower(bool enable)
     LED_OFF();
     nrf_gpio_cfg_input(PM_VBAT_SINK_PIN, NRF_GPIO_PIN_NOPULL);
     NRF_POWER->GPREGRET |= 0x01; // Workaround for not being able to determine reset reason...
-#ifdef BLE
-    sd_power_system_off();
-#else
+
     NRF_POWER->SYSTEMOFF = 1UL;
-#endif
+
     while(1);
   }
 }

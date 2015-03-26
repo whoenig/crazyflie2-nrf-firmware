@@ -31,12 +31,7 @@
 
 #include <nrf.h>
 
- #include "SEGGER_RTT.h"
-
-#ifdef BLE
-#include <ble_gap.h>
-#include <nrf_soc.h>
-#endif
+#include "SEGGER_RTT.h"
 
 static void esbInterruptHandler();
 
@@ -229,13 +224,8 @@ void esbInit()
 {
   NRF_RADIO->POWER = 1;
   // Enable Radio interrupts
-#ifndef BLE
   NVIC_SetPriority(RADIO_IRQn, 3);
   NVIC_EnableIRQ(RADIO_IRQn);
-#else
-  NVIC_EnableIRQ(RADIO_IRQn);
-#endif
-
 
   NRF_RADIO->TXPOWER = (txpower << RADIO_TXPOWER_TXPOWER_Pos);
 
@@ -308,9 +298,9 @@ void esbReset()
   // esbDeinit();
   // esbInit();
   if (!isInit) return;
-#ifndef BLE
+
   __disable_irq();
-#endif
+
   NRF_RADIO->SHORTS = 0;
   NRF_RADIO->INTENCLR = 0xFFFFFFFF;
   NRF_RADIO->EVENTS_DISABLED = 0;
@@ -320,16 +310,14 @@ void esbReset()
 
   NVIC_GetPendingIRQ(RADIO_IRQn);
   __enable_irq();
-#ifndef BLE
+
   esbInit();
-#endif
+
 }
 
 void esbDeinit()
 {
-#ifndef BLE
   NVIC_DisableIRQ(RADIO_IRQn);
-#endif
 
   NRF_RADIO->INTENCLR = RADIO_INTENSET_END_Msk;
   NRF_RADIO->SHORTS = 0;
@@ -444,19 +432,9 @@ void esbSetDatarate(EsbDatarate dr)
   esbReset();
 }
 
-void ble_advertising_stop(void);
-void advertising_start(void);
 void esbSetContwave(bool enable)
 {
   contwave = enable;
-
-#ifdef BLE
-  if (enable)
-    ble_advertising_stop();
-  else
-    advertising_start();
-#endif
-
 
   esbReset();
 }

@@ -23,10 +23,6 @@
  */
 #include <nrf.h>
 
-#ifdef BLE
-#include <nrf_soc.h>
-#endif
-
 #include <stdio.h>
 #include <string.h>
 
@@ -42,25 +38,16 @@
 
 #include "SEGGER_RTT.h"
 
-#ifdef BLE
-#include "ble_crazyflies.h"
-#endif
-
 #define CFMODE_RX 0
 #define CFMODE_TX 1
 
 extern void  initialise_monitor_handles(void);
-extern int ble_init(void);
 
 #ifndef SEMIHOSTING
 #define printf(...)
 #endif
 
 static void mainloop(void);
-
-#if BLE==0
-#undef BLE
-#endif
 
 static bool boottedFromBootloader;
 
@@ -103,12 +90,8 @@ int main()
 {
   systickInit();
 
-#ifdef BLE
-  ble_init();
-#else
   NRF_CLOCK->TASKS_HFCLKSTART = 1UL;
   while(!NRF_CLOCK->EVENTS_HFCLKSTARTED);
-#endif
 
 #ifdef SEMIHOSTING
   initialise_monitor_handles();
