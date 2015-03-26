@@ -4,8 +4,8 @@
 CLOAD_SCRIPT ?= ../crazyflie-clients-python/bin/cfloader
 
 S110 ?= 1     # SoftDevice flashed or not
-BLE  ?= 1     # BLE mode activated or not. If disabled, CRTP mode is active
-CFMODE ?= 1   # Check if crazyflie mode is Tx or not.
+BLE  ?= 0     # BLE mode activated or not. If disabled, CRTP mode is active
+CFMODE ?= RX  # RX or TX
 
 CROSS_COMPILE?=arm-none-eabi-
 
@@ -75,17 +75,13 @@ CFLAGS += -I$(NRF51_SDK)/Include/app_common/
 CFLAGS += -I$(NRF51_SDK)/Include/sd_common/
 endif
 
-CFLAGS += -DCFMODE=$(strip $(CFMODE))
+CFLAGS += -DCFMODE=CFMODE_$(strip $(CFMODE))
 
 OBJS += src/main.o gcc_startup_nrf51.o system_nrf51.o src/uart.o \
         src/pm.o src/systick.o src/button.o \
         src/ow/crcutil.o \
+        src/esb.o \
         src/SEGGER_RTT.o src/SEGGER_RTT_printf.o
-
-# mode 2 or 3 qualify for esb
-ifeq ($(CFMODE),$(filter $(CFMODE),2 3))
-    OBJS += src/esb.o
-endif
 
 all: $(PROGRAM).elf $(PROGRAM).bin $(PROGRAM).hex
 	$(SIZE) $(PROGRAM).elf

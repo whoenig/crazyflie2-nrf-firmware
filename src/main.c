@@ -30,9 +30,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#if CFMODE == 2 || CFMODE == 3
-  #include "esb.h"
-#endif
+#include "esb.h"
+
 #include "led.h"
 #include "button.h"
 #include "pm.h"
@@ -46,6 +45,9 @@
 #ifdef BLE
 #include "ble_crazyflies.h"
 #endif
+
+#define CFMODE_RX 0
+#define CFMODE_TX 1
 
 extern void  initialise_monitor_handles(void);
 extern int ble_init(void);
@@ -62,7 +64,7 @@ static void mainloop(void);
 
 static bool boottedFromBootloader;
 
-#if CFMODE == 2
+#if CFMODE == CFMODE_RX
 static unsigned int channel;
 static int count = 0;
 static int channelSwitchAckTime;
@@ -90,7 +92,7 @@ void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
 }
 #endif
 
-#if CFMODE == 3
+#if CFMODE == CFMODE_TX
 static unsigned int channel;
 static int count = 0;
 static EsbDatarate datarate;
@@ -140,20 +142,18 @@ int main()
 
   NRF_GPIO->PIN_CNF[RADIO_PAEN_PIN] |= GPIO_PIN_CNF_DIR_Output | (GPIO_PIN_CNF_DRIVE_S0H1<<GPIO_PIN_CNF_DRIVE_Pos);
 
-  #if CFMODE == 2 || CFMODE == 3 //Bitcraze RX-mode & Bitcraze TX Mode
-    channel = 0;
-    count = 0;
-    datarate = esbDatarate250K;
+  channel = 0;
+  count = 0;
+  datarate = esbDatarate250K;
 
-    esbSetDatarate(datarate);
-    esbSetChannel(channel);
-    esbSetTxPower(txpower);
-    esbInit();
-  #endif
+  esbSetDatarate(datarate);
+  esbSetChannel(channel);
+  esbSetTxPower(txpower);
+  esbInit();
 
   SEGGER_RTT_ConfigUpBuffer(0, NULL, NULL, 0, SEGGER_RTT_MODE_NO_BLOCK_SKIP);
 
-  #if CFMODE == 2 // Bitcraze RX Mode
+  #if CFMODE == CFMODE_RX
     esbSetPacketReceivedHandler(packetReceivedHandler);
     esbStartRx();
   #endif
@@ -175,7 +175,7 @@ void delayms(int delay)
 
 void mainloop()
 {
-#if CFMODE == 3
+#if CFMODE == CFMODE_TX
   EsbPacket packet;
   EsbPacket* ack;
   packet.data[0] = 0xCA;
@@ -193,7 +193,7 @@ void mainloop()
       LED_ON();
       nrf_gpio_pin_set(RADIO_PAEN_PIN);
 
-      #if CFMODE == 2 // Bitcraze RX Mode
+      #if CFMODE == CFMODE_RX
         if (count == 20 && systickGetTick() >= channelSwitchAckTime + 50)
         {
           count = 0;
@@ -269,7 +269,7 @@ void mainloop()
         //  esbReleaseRxPacket(packet);
         //}
       #endif
-      #if CFMODE == 3 // Bitcraze TX Mode
+      #if CFMODE == CFMODE_TX
         packet.pid = (packet.pid + 1) % 4;
         packet.size = 16;
         packet.data[0] = channel;
