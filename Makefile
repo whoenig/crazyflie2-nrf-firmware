@@ -27,7 +27,7 @@ NRF_S110 ?= s110
 
 INCLUDES= -I Include -I Include/gcc -Iinterface
 
-PERSONAL_DEFINES ?= 
+PERSONAL_DEFINES ?=
 
 PROCESSOR = -mcpu=cortex-m0 -mthumb
 NRF= -DNRF51
@@ -65,14 +65,14 @@ OBJS += $(NRF51_SDK)/Source/sd_common/softdevice_handler.o
 OBJS += $(NRF51_SDK)/Source/app_common/app_timer.o
 
 
-CFLAGS += -DBLE_STACK_SUPPORT_REQD -DNRF51 
-CFLAGS += -I$(NRF51_SDK)/Include/gcc 
-CFLAGS += -I$(NRF51_SDK)/Include/ 
-CFLAGS += -I$(NRF51_SDK)/Include/ble/ 
-CFLAGS += -I$(NRF51_SDK)/Include/ble/ble_services/ 
+CFLAGS += -DBLE_STACK_SUPPORT_REQD -DNRF51
+CFLAGS += -I$(NRF51_SDK)/Include/gcc
+CFLAGS += -I$(NRF51_SDK)/Include/
+CFLAGS += -I$(NRF51_SDK)/Include/ble/
+CFLAGS += -I$(NRF51_SDK)/Include/ble/ble_services/
 CFLAGS += -I$(NRF_S110)/s110_nrf51822_7.0.0_API/include
-CFLAGS += -I$(NRF51_SDK)/Include/app_common/ 
-CFLAGS += -I$(NRF51_SDK)/Include/sd_common/ 
+CFLAGS += -I$(NRF51_SDK)/Include/app_common/
+CFLAGS += -I$(NRF51_SDK)/Include/sd_common/
 endif
 
 CFLAGS += -DCFMODE=$(strip $(CFMODE))
@@ -85,8 +85,6 @@ OBJS += src/main.o gcc_startup_nrf51.o system_nrf51.o src/uart.o \
 # mode 2 or 3 qualify for esb
 ifeq ($(CFMODE),$(filter $(CFMODE),2 3))
     OBJS += src/esb.o
-else
-    OBJS += src/micro_esb.o
 endif
 
 all: $(PROGRAM).elf $(PROGRAM).bin $(PROGRAM).hex

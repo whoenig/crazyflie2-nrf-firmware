@@ -32,9 +32,6 @@
 
 #if CFMODE == 2 || CFMODE == 3
   #include "esb.h"
-#else
-  #include "micro_esb.h"
-  #include "uesb_error_codes.h"
 #endif
 #include "led.h"
 #include "button.h"
@@ -64,114 +61,6 @@ static void mainloop(void);
 #endif
 
 static bool boottedFromBootloader;
-
-#if CFMODE == 0 || CFMODE == 1
-static uesb_payload_t rx_payload;
-static uesb_payload_t ack_payload;
-static uint8_t channel;
-static uesb_bitrate_t bitrate = UESB_BITRATE_250KBPS;
-
-static int count = 0;
-
-static int channelSwitchAckTime = 0;
-
-void uesb_event_handler()
-{
-    static uint32_t rf_interrupts;
-    // static uint32_t tx_attempts;
-
-    uesb_get_clear_interrupts(&rf_interrupts);
-
-    // if(rf_interrupts & UESB_INT_TX_SUCCESS_MSK)
-    // {
-    // }
-
-    if(rf_interrupts & UESB_INT_TX_FAILED_MSK)
-    {
-        uesb_flush_tx();
-    }
-
-    // if(rf_interrupts & UESB_INT_RX_DR_MSK)
-    // {
-    //     uesb_read_rx_payload(&rx_payload);
-    //     NRF_GPIO->OUTCLR = 0xFUL << 8;
-    //     NRF_GPIO->OUTSET = (uint32_t)((rx_payload.data[2] & 0x0F) << 8);
-    // }
-    if(rf_interrupts & UESB_INT_RX_DR_MSK)
-    {
-    #if CFMODE == 0
-      LED_OFF();
-      uesb_read_rx_payload(&rx_payload);
-
-      count = rx_payload.data[1];
-
-      ack_payload.length = 3;
-      ack_payload.data[0] = channel;
-      ack_payload.data[1] = count;
-      ack_payload.data[2] = rx_payload.rssi;
-
-      uesb_write_ack_payload(&ack_payload);
-      // SEGGER_RTT_Write(0, (const char*)&ack_payload.data[0], 3);
-
-      SEGGER_RTT_printf(0, "%d,%d,%d\n", channel, count, rx_payload.rssi);
-      // char bla[10];
-      // itoa(count, bla, 10);
-      // int len = strlen(bla);
-      // bla[len] = '\n';
-      // bla[len+1] = '\0';
-      // SEGGER_RTT_Write(0, (const char*)&count, sizeof(count));
-      // SEGGER_RTT_Write(0, "\n", 1);
-      //++count;
-      if (!channelSwitchAckTime && count == 20)// && channel == rx_payload.data[0])
-      {
-        // SEGGER_RTT_printf(0, "%d,%d,%d\n", channel, count, rx_payload.rssi);
-        // SEGGER_RTT_printf(0, "CSAT");
-        channelSwitchAckTime = systickGetTick();
-      }
-    #endif
-    #if CFMODE == 1
-      uesb_read_rx_payload(&rx_payload);
-      // SEGGER_RTT_printf(0, "%d,%d\n", rx_payload.data[0], rx_payload.data[1]);
-      if (channel == rx_payload.data[0] && count == rx_payload.data[1])
-      {
-        //if (!channelSwitchAckTime && count == 20)
-        if (count == 20)
-        {
-          channel = rx_payload.data[0];
-          channel += 1;
-          if (channel == 126) {
-            switch (bitrate)
-            {
-              case UESB_BITRATE_250KBPS:
-                bitrate = UESB_BITRATE_1MBPS;
-                break;
-              case UESB_BITRATE_1MBPS:
-                bitrate = UESB_BITRATE_2MBPS;
-                break;
-              case UESB_BITRATE_2MBPS:
-                bitrate = UESB_BITRATE_250KBPS;
-                break;
-            }
-            uesb_set_bitrate(bitrate);
-            channel = 0;
-          }
-          uesb_set_rf_channel(channel);
-          count = 0;
-          // channelSwitchAckTime = systickGetTick();
-        }
-        else// if (count < 20)
-        {
-          count += 1;
-        }
-      }
-    #endif
-    }
-
-    // uesb_get_tx_attempts(&tx_attempts);
-    // NRF_GPIO->OUTCLR = 0xFUL << 12;
-    // NRF_GPIO->OUTSET = (tx_attempts & 0x0F) << 12;
-}
-#endif
 
 #if CFMODE == 2
 static unsigned int channel;
@@ -260,34 +149,9 @@ int main()
     esbSetChannel(channel);
     esbSetTxPower(txpower);
     esbInit();
-  #else // RX or TX (u-esb lib)
-  channel = 100;
-  uesb_config_t uesb_config       = UESB_DEFAULT_CONFIG;
-  uesb_config.rf_channel          = channel;
-  uesb_config.crc                 = UESB_CRC_16BIT; // TODO
-  //uesb_config.retransmit_count    = 6;
-  uesb_config.retransmit_delay    = 500;
-  uesb_config.protocol            = UESB_PROTOCOL_ESB_DPL;
-  uesb_config.bitrate             = UESB_BITRATE_2MBPS;
-  uesb_config.event_handler       = uesb_event_handler;
-  uesb_config.tx_output_power     = UESB_TX_POWER_0DBM,
-  uesb_config.dynamic_ack_enabled = 1;
-  #if CFMODE == 0 // RX
-    uesb_config.mode                = UESB_MODE_PRX;
-  #endif
-
-  uesb_init(&uesb_config);
-
-  uint8_t addr[] = {0xE7, 0xE7, 0xE7, 0xE7, 0xE7};
-  uesb_set_address(UESB_ADDRESS_PIPE0, addr);
-
   #endif
 
   SEGGER_RTT_ConfigUpBuffer(0, NULL, NULL, 0, SEGGER_RTT_MODE_NO_BLOCK_SKIP);
-
-  #if CFMODE == 0 // RX
-    uesb_start_rx();
-  #endif
 
   #if CFMODE == 2 // Bitcraze RX Mode
     esbSetPacketReceivedHandler(packetReceivedHandler);
@@ -311,17 +175,6 @@ void delayms(int delay)
 
 void mainloop()
 {
-#if CFMODE == 1
-  uesb_payload_t tx_payload;
-
-  tx_payload.length  = 16;
-  tx_payload.pipe    = 0;
-  tx_payload.data[0] = 0xCA;
-  tx_payload.data[1] = 0xFE;
-  tx_payload.data[2] = 0xBA;
-  tx_payload.data[3] = 0xBE;
-#endif
-
 #if CFMODE == 3
   EsbPacket packet;
   EsbPacket* ack;
@@ -489,63 +342,6 @@ void mainloop()
         // {
         //   SEGGER_RTT_printf(0, "-");
         // }
-      #endif
-      #if CFMODE==1 // Tx
-        tx_payload.data[0] = channel;
-        tx_payload.data[1] = count;
-        uint32_t res = uesb_write_tx_payload(&tx_payload);
-        //SEGGER_RTT_printf(0, "%d\n", res);
-        if (res == UESB_SUCCESS)
-        {
-          LED_OFF();
-          //SEGGER_RTT_printf(0, "%d\n", count);
-          //++count;
-        }
-      #endif
-
-      //#if CFMODE==0
-      // switch channel 10ms after we ACK'ed the 20th packet
-      //if (count == 20 && systickGetTick() >= channelSwitchAckTime + 20)
-      //#elif CFMODE == 1
-      //if (count == 21 && systickGetTick() >= channelSwitchAckTime + 20)
-      //#endif
-      #if CFMODE==0 || CFMODE==1
-      if (count == 20 && channelSwitchAckTime && systickGetTick() >= channelSwitchAckTime + 20)
-      {
-        channel += 1;
-        // if (channel > 125) {
-          // channel = 0;
-        // }
-        #if CFMODE==0
-        uesb_stop_rx();
-        #endif
-        uesb_flush_rx();
-        uesb_flush_tx();
-        if (channel == 126) {
-          switch (bitrate)
-          {
-            case UESB_BITRATE_250KBPS:
-              bitrate = UESB_BITRATE_1MBPS;
-              break;
-            case UESB_BITRATE_1MBPS:
-              bitrate = UESB_BITRATE_2MBPS;
-              break;
-            case UESB_BITRATE_2MBPS:
-              bitrate = UESB_BITRATE_250KBPS;
-              break;
-          }
-          uesb_set_bitrate(bitrate);
-          channel = 0;
-        }
-        uesb_set_rf_channel(channel);
-        #if CFMODE==0
-        uesb_start_rx();
-        #endif
-        //SEGGER_RTT_printf(0, "Update Channel: %d\n", channel);
-        count = 0;
-        channelSwitchAckTime = 0;
-      }
-
       #endif
     }
     else
