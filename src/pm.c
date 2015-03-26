@@ -30,7 +30,6 @@
 #include "button.h"
 #include "led.h"
 #include "systick.h"
-#include "uart.h"
 
 static PmState state;
 static PmState targetState;
@@ -140,11 +139,9 @@ static void pmSysBoot(bool enable)
       nrf_gpio_pin_clear(STM_BOOT0_PIN);
     }
 
-    uartInit();
   } else {
     nrf_gpio_cfg_input(STM_BOOT0_PIN, NRF_GPIO_PIN_PULLDOWN);
 
-    uartDeinit();
   }
 }
 
