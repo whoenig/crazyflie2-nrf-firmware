@@ -10,6 +10,7 @@ config.mk
 .cproject
 .project
 .settings
+*.pyc
 
 #Nordic libs
 s110
