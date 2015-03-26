@@ -8,14 +8,14 @@ There are separate helper scripts to automate the data collection on the PC-side
 Usage
 -----
 
-. Clean: `make clean`
-. Compile: `make CFMODE=RX` or `make CFMODE=TX`
-. Press the button on the CF for 3 seconds until the two blue LEDs start to blink.
-. Flash using Crazyradio: `make CFMODE=RX cload` or make `CFMODE=TX cload`
-. Connect receiving Crazyflie via nrf Debug adapter and J-Link EDU to PC
-. Run `./JLinkExe -device NRF51 -speed 4000 -if SWD` on the PC
-. Run `python3 channelscanRTT.py` from the scripts folder
-. Turn transmitting Crazyflie on
+0. Clean: `make clean`
+0. Compile: `make CFMODE=RX` or `make CFMODE=TX`
+0. Press the button on the CF for 3 seconds until the two blue LEDs start to blink.
+0. Flash using Crazyradio: `make CFMODE=RX cload` or make `CFMODE=TX cload`
+0. Connect receiving Crazyflie via nrf Debug adapter and J-Link EDU to PC
+0. Run `./JLinkExe -device NRF51 -speed 4000 -if SWD` on the PC
+0. Run `python3 channelscanRTT.py` from the scripts folder
+0. Turn transmitting Crazyflie on
 
 Setup J-Link
 ------------
