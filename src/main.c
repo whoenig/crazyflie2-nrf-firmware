@@ -58,6 +58,9 @@ static void mainloop(void);
   #if SCAN_MODE == SCAN_MODE_DATARATE
     static int datarateSwitchAckTime = 0;
   #endif
+  #if SCAN_MODE == SCAN_MODE_POWER
+    static int powerSwitchAckTime = 0;
+  #endif
   #if SCAN_MODE == SCAN_MODE_NONE
     static uint32_t rssi_sum;
     static uint32_t rssi_count;
@@ -65,14 +68,15 @@ static void mainloop(void);
   void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
   {
     #if SCAN_MODE == SCAN_MODE_CHANNEL
-      ack->data[0] = channel;
+      ack->data[0] = received->data[0];
       channelSwitchAckTime = systickGetTick();
     #endif
     #if SCAN_MODE == SCAN_MODE_POWER
-      ack->data[0] = txpower;
+      ack->data[0] = received->data[0];
+      powerSwitchAckTime = systickGetTick();
     #endif
     #if SCAN_MODE == SCAN_MODE_DATARATE
-      ack->data[0] = datarate;
+      ack->data[0] = received->data[0];
       datarateSwitchAckTime = systickGetTick();
     #endif
 
@@ -226,8 +230,12 @@ void mainloop()
         }
       #endif
       #if SCAN_MODE == SCAN_MODE_POWER
-        txpower = getNextPower(txpower);
-        esbSetTxPower(txpower);
+        if (powerSwitchAckTime && systickGetTick() >= powerSwitchAckTime + 10)
+        {
+          txpower = getNextPower(txpower);
+          esbSetTxPower(txpower);
+          powerSwitchAckTime = 0;
+        }
       #endif
       #if SCAN_MODE == SCAN_MODE_DATARATE
         if (datarateSwitchAckTime && systickGetTick() >= datarateSwitchAckTime + 50)
@@ -253,7 +261,15 @@ void mainloop()
     #if CFMODE == CFMODE_TX
       packet.pid = (packet.pid + 1) % 4;
       packet.size = 32;
-      packet.data[0] = channel;
+      #if SCAN_MODE == SCAN_MODE_CHANNEL
+        packet.data[0] = channel;
+      #endif
+      #if SCAN_MODE == SCAN_MODE_POWER
+        packet.data[0] = txpower;
+      #endif
+      #if SCAN_MODE == SCAN_MODE_DATARATE
+        packet.data[0] = datarate;
+      #endif
       ack = esbSendPacket(&packet);
       if (ack && ack->size)
       {
