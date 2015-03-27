@@ -30,7 +30,6 @@
 
 #include "led.h"
 #include "button.h"
-#include "pm.h"
 #include "pinout.h"
 #include "systick.h"
 
@@ -46,15 +45,7 @@
 #define SCAN_MODE_POWER    2
 #define SCAN_MODE_DATARATE 3
 
-extern void  initialise_monitor_handles(void);
-
-#ifndef SEMIHOSTING
-#define printf(...)
-#endif
-
 static void mainloop(void);
-
-static bool boottedFromBootloader;
 
 #if CFMODE == CFMODE_RX
 static unsigned int channel;
@@ -126,25 +117,8 @@ int main()
   while(!NRF_CLOCK->EVENTS_LFCLKSTARTED);
 
   LED_INIT();
-  if ((NRF_POWER->GPREGRET & 0x80) && ((NRF_POWER->GPREGRET&(0x3<<1))==0)) {
-    buttonInit(buttonShortPress);
-  } else {
-    buttonInit(buttonIdle);
-  }
-
-  if  (NRF_POWER->GPREGRET & 0x20) {
-    boottedFromBootloader = true;
-    NRF_POWER->GPREGRET &= ~0x20;
-  }
-
-  pmInit();
-
-  if ((NRF_POWER->GPREGRET&0x01) == 0) {
-		  pmSetState(pmSysRunning);
-  }
-
+  buttonInit(buttonIdle);
   LED_ON();
-
 
   NRF_GPIO->PIN_CNF[RADIO_PAEN_PIN] |= GPIO_PIN_CNF_DIR_Output | (GPIO_PIN_CNF_DRIVE_S0H1<<GPIO_PIN_CNF_DRIVE_Pos);
 
@@ -168,7 +142,6 @@ int main()
   mainloop();
 
   // The main loop should never end
-  // TODO see if we should shut-off the system there?
   while(1);
 
   return 0;
@@ -223,8 +196,6 @@ EsbDatarate getNextDatarate(EsbDatarate dr)
   return esbDatarate250K;
 }
 
-
-
 void mainloop()
 {
 #if CFMODE == CFMODE_TX
@@ -235,284 +206,106 @@ void mainloop()
   packet.size = 1;
 #endif
 
+#if CFMODE == CFMODE_RX
   int lastPacket = systickGetTick();
+#endif
 
   nrf_gpio_cfg_output(RADIO_PAEN_PIN);
+  nrf_gpio_pin_set(RADIO_PAEN_PIN);
 
   while(1)
   {
-    PmState state = pmGetState();
-    if (state != pmSysOff)
-    {
-      LED_ON();
-      nrf_gpio_pin_set(RADIO_PAEN_PIN);
 
-      #if CFMODE == CFMODE_RX
-        #if SCAN_MODE == SCAN_MODE_CHANNEL
-          if (count == 10 && systickGetTick() >= channelSwitchAckTime + 50)
-          {
-            channel = getNextChannel(channel);
+    #if CFMODE == CFMODE_RX
+      #if SCAN_MODE == SCAN_MODE_CHANNEL
+        if (count == 10 && systickGetTick() >= channelSwitchAckTime + 50)
+        {
+          channel = getNextChannel(channel);
+          esbStopRx();
+          esbSetChannel(channel);
+          esbStartRx();
+          count = 0;
+        }
+      #endif
+      #if SCAN_MODE == SCAN_MODE_POWER
+        if (count == 10)
+        {
+            txpower = getNextPower(txpower);
+            esbSetTxPower(txpower);
+            count = 0;
+        }
+      #endif
+      #if SCAN_MODE == SCAN_MODE_DATARATE
+        if (count == 10 && systickGetTick() >= channelSwitchAckTime + 50)
+        {
+            datarate = getNextDatarate(datarate);
             esbStopRx();
-            esbSetChannel(channel);
+            esbSetDatarate(datarate);
             esbStartRx();
             count = 0;
-          }
-        #endif
-        #if SCAN_MODE == SCAN_MODE_POWER
-          if (count == 10)
-          {
-              txpower = getNextPower(txpower);
-              esbSetTxPower(txpower);
-              count = 0;
-          }
-        #endif
-        #if SCAN_MODE == SCAN_MODE_DATARATE
-          if (count == 10 && systickGetTick() >= channelSwitchAckTime + 50)
-          {
-              datarate = getNextDatarate(datarate);
-              esbStopRx();
-              esbSetDatarate(datarate);
-              esbStartRx();
-              count = 0;
-          }
-        #endif
-        #if SCAN_MODE == SCAN_MODE_NONE
-          if (rssi_count > 0 && systickGetTick() >= lastPacket + 100)
-          {
-            int rssi = rssi_sum / rssi_count;
-            SEGGER_RTT_Write(0, (const char*)&(rssi), 1);
-            rssi_count = 0;
-            rssi_sum = 0;
-            lastPacket = systickGetTick();
-          }
-        #endif
-
-        // if (count == 20 && systickGetTick() >= channelSwitchAckTime + 50)
-        // {
-        //   count = 0;
-        //   channel += 1;
-        //   if (channel == 126) {
-        //     // switch (datarate)
-        //     // {
-        //     //   case esbDatarate250K:
-        //     //     datarate = esbDatarate1M;
-        //     //     break;
-        //     //   case esbDatarate1M:
-        //     //     datarate = esbDatarate2M;
-        //     //     break;
-        //     //   case esbDatarate2M:
-        //     //     datarate = esbDatarate250K;
-        //     //     switch(txpower)
-        //     //     {
-        //     //     case RADIO_TXPOWER_TXPOWER_Pos4dBm:
-        //     //       txpower = RADIO_TXPOWER_TXPOWER_0dBm;
-        //     //       break;
-        //     //     case RADIO_TXPOWER_TXPOWER_0dBm:
-        //     //       txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm;
-        //     //       break;
-        //     //     }
-        //     //     esbSetTxPower(txpower);
-        //     //     break;
-        //     // }
-        //     // esbSetDatarate(datarate);
-
-        //     switch(txpower)
-        //     {
-        //     case RADIO_TXPOWER_TXPOWER_Pos4dBm:
-        //       txpower = RADIO_TXPOWER_TXPOWER_0dBm;
-        //       break;
-        //     case RADIO_TXPOWER_TXPOWER_0dBm:
-        //       txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm;
-        //       break;
-        //     case RADIO_TXPOWER_TXPOWER_Neg4dBm:
-        //       txpower = RADIO_TXPOWER_TXPOWER_Neg8dBm;
-        //       break;
-        //     case RADIO_TXPOWER_TXPOWER_Neg8dBm:
-        //       txpower = RADIO_TXPOWER_TXPOWER_Neg12dBm;
-        //       break;
-        //     case RADIO_TXPOWER_TXPOWER_Neg12dBm:
-        //       txpower = RADIO_TXPOWER_TXPOWER_Neg16dBm;
-        //       break;
-        //     case RADIO_TXPOWER_TXPOWER_Neg16dBm:
-        //       txpower = RADIO_TXPOWER_TXPOWER_Neg20dBm;
-        //       break;
-        //     case RADIO_TXPOWER_TXPOWER_Neg20dBm:
-        //       txpower = RADIO_TXPOWER_TXPOWER_Neg30dBm;
-        //       break;
-        //     case RADIO_TXPOWER_TXPOWER_Neg30dBm:
-        //       txpower = RADIO_TXPOWER_TXPOWER_Pos4dBm;
-        //       break;
-        //     }
-        //     esbSetTxPower(txpower);
-
-        //     channel = 0;
-        //   }
-        //   // esbReset();
-        //   // esbStartRx();
-        //   esbStopRx();
-        //   // delayms(250);
-        //   esbSetChannel(channel);
-        //   // delayms(250);
-        //   esbStartRx();
-        //   // SEGGER_RTT_printf(0, "Channel: %d\n", channel);
-        // }
-        // //if (esbIsRxPacket())
-        // //{
-        // //  EsbPacket* packet = esbGetRxPacket();
-        // //  esbReleaseRxPacket(packet);
-        // //}
+        }
       #endif
-      #if CFMODE == CFMODE_TX
-        packet.pid = (packet.pid + 1) % 4;
-        packet.size = 16;
-        packet.data[0] = channel;
-        packet.data[1] = count;
-        ack = esbSendPacket(&packet);
-          if (ack && ack->size)
+      #if SCAN_MODE == SCAN_MODE_NONE
+        if (rssi_count > 0 && systickGetTick() >= lastPacket + 100)
+        {
+          int rssi = rssi_sum / rssi_count;
+          SEGGER_RTT_Write(0, (const char*)&(rssi), 1);
+          rssi_count = 0;
+          rssi_sum = 0;
+          lastPacket = systickGetTick();
+        }
+      #endif
+    #endif
+    #if CFMODE == CFMODE_TX
+      packet.pid = (packet.pid + 1) % 4;
+      packet.size = 16;
+      packet.data[0] = channel;
+      packet.data[1] = count;
+      ack = esbSendPacket(&packet);
+        if (ack && ack->size)
+        {
+          if (ack->data[1] == count)
           {
-            if (ack->data[1] == count)
+            if (count == 10)
             {
-              if (count == 10)
-              {
-                #if SCAN_MODE == SCAN_MODE_CHANNEL
-                  channel = ack->data[0] + 1;
-                  if (channel == 126) {
-                    channel = 0;
-                  }
-                  esbSetChannel(channel);
-                #endif
-                #if SCAN_MODE == SCAN_MODE_POWER
-                  txpower = getNextPower(txpower);
-                  esbSetTxPower(txpower);
-                #endif
-                #if SCAN_MODE == SCAN_MODE_DATARATE
-                  datarate = getNextDatarate(datarate);
-                  esbSetDatarate(datarate);
-                #endif
-                count = 0;
-              }
-              else
-              {
-                count += 1;
-              }
+              #if SCAN_MODE == SCAN_MODE_CHANNEL
+                channel = ack->data[0] + 1;
+                if (channel == 126) {
+                  channel = 0;
+                }
+                esbSetChannel(channel);
+              #endif
+              #if SCAN_MODE == SCAN_MODE_POWER
+                txpower = getNextPower(txpower);
+                esbSetTxPower(txpower);
+              #endif
+              #if SCAN_MODE == SCAN_MODE_DATARATE
+                datarate = getNextDatarate(datarate);
+                esbSetDatarate(datarate);
+              #endif
+              count = 0;
+            }
+            else
+            {
+              count += 1;
             }
           }
-        // #endif
+        }
 
-        // if (ack && ack->size)
-        // {
-        //   if (ack->data[1] == count)
-        //   {
-        //     if (count == 20)
-        //     {
-        //       channel = ack->data[0] + 1;
-        //       if (channel == 126) {
-        //         // switch (datarate)
-        //         // {
-        //         //   case esbDatarate250K:
-        //         //     datarate = esbDatarate1M;
-        //         //     break;
-        //         //   case esbDatarate1M:
-        //         //     datarate = esbDatarate2M;
-        //         //     break;
-        //         //   case esbDatarate2M:
-        //         //     datarate = esbDatarate250K;
-        //         //     break;
-        //         // }
-        //         // esbSetDatarate(datarate);
-
-        //         switch(txpower)
-        //         {
-        //         case RADIO_TXPOWER_TXPOWER_Pos4dBm:
-        //           txpower = RADIO_TXPOWER_TXPOWER_0dBm;
-        //           break;
-        //         case RADIO_TXPOWER_TXPOWER_0dBm:
-        //           txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm;
-        //           break;
-        //         case RADIO_TXPOWER_TXPOWER_Neg4dBm:
-        //           txpower = RADIO_TXPOWER_TXPOWER_Neg8dBm;
-        //           break;
-        //         case RADIO_TXPOWER_TXPOWER_Neg8dBm:
-        //           txpower = RADIO_TXPOWER_TXPOWER_Neg12dBm;
-        //           break;
-        //         case RADIO_TXPOWER_TXPOWER_Neg12dBm:
-        //           txpower = RADIO_TXPOWER_TXPOWER_Neg16dBm;
-        //           break;
-        //         case RADIO_TXPOWER_TXPOWER_Neg16dBm:
-        //           txpower = RADIO_TXPOWER_TXPOWER_Neg20dBm;
-        //           break;
-        //         case RADIO_TXPOWER_TXPOWER_Neg20dBm:
-        //           txpower = RADIO_TXPOWER_TXPOWER_Neg30dBm;
-        //           break;
-        //         case RADIO_TXPOWER_TXPOWER_Neg30dBm:
-        //           txpower = RADIO_TXPOWER_TXPOWER_Pos4dBm;
-        //           break;
-        //         }
-        //         esbSetTxPower(txpower);
-
-        //         channel = 0;
-        //       }
-        //       esbSetChannel(channel);
-        //       count = 0;
-        //     }
-        //     else
-        //     {
-        //       count += 1;
-        //     }
-        //   }
-        //   //SEGGER_RTT_printf(0, "%d\n", ack->data[1]);
-        // }
-        // // else
-        // // {
-        // //   SEGGER_RTT_printf(0, "-");
-        // // }
-      #endif
-    }
-    else
-    {
-      LED_OFF();
-    }
+    #endif
 
     // Button event handling
     ButtonEvent be = buttonGetState();
-    bool usbConnected = pmUSBPower();
-    if ((pmGetState() != pmSysOff) && be && !usbConnected)
+    if (be == buttonShortPress)
     {
-      pmSetState(pmAllOff);
-      /*swdInit();
-      swdTest();*/
+      //stop NRF
+      LED_OFF();
+      nrf_gpio_cfg_input(PM_VBAT_SINK_PIN, NRF_GPIO_PIN_NOPULL);
+
+      NRF_POWER->SYSTEMOFF = 1UL;
     }
-    else if ((pmGetState() != pmSysOff) && be && usbConnected)
-    {
-    	//pmSetState(pmSysOff);
-      pmSetState(pmAllOff);
-        /*swdInit();
-        swdTest();*/
-    }
-    else if ((pmGetState() == pmSysOff) && (be == buttonShortPress))
-    {
-      //Normal boot
-      pmSysBootloader(false);
-      pmSetState(pmSysRunning);
-    }
-    else if ((pmGetState() == pmSysOff) && boottedFromBootloader)
-    {
-      //Normal boot after bootloader
-      pmSysBootloader(false);
-      pmSetState(pmSysRunning);
-    }
-    else if ((pmGetState() == pmSysOff) && (be == buttonLongPress))
-    {
-      //stm bootloader
-      pmSysBootloader(true);
-      pmSetState(pmSysRunning);
-    }
-    boottedFromBootloader = false;
 
     // processes loop
     buttonProcess();
-    pmProcess();
-    //owRun();       //TODO!
   }
 }
-
