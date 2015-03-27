@@ -420,8 +420,8 @@ EsbPacket* esbSendPacket(EsbPacket* packet)
 
   // SEGGER_RTT_printf(0, "%d\n", NRF_RADIO->STATE);
 
-  // wait 10ms max
-  while (startTime + 10 >= systickGetTick()) {
+  // wait 2ms max
+  while (startTime + 2 >= systickGetTick()) {
     if (receivedAck) {
       return &recvPacket;
     }

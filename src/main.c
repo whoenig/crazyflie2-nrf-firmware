@@ -48,63 +48,52 @@
 static void mainloop(void);
 
 #if CFMODE == CFMODE_RX
-static unsigned int channel;
-static int count = 0;
-static int channelSwitchAckTime;
-static EsbDatarate datarate;
-static int txpower;
-  #if SCAN_MODE == SCAN_MODE_NONE
-  static uint32_t rssi_sum;
-  static uint32_t rssi_count;
-  #endif
-void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
-{
-  // int i;
-  count = received->data[1];
+  static unsigned int channel;
+  static EsbDatarate datarate;
+  static int txpower;
 
   #if SCAN_MODE == SCAN_MODE_CHANNEL
-    ack->data[0] = channel;
+    static int channelSwitchAckTime = 0;
   #endif
-  #if SCAN_MODE == SCAN_MODE_POWER
-    ack->data[0] = txpower;
-  #endif
-  #if SCAN_MODE == SCAN_MODE_DATARATE
-    ack->data[0] = datarate;
-  #endif
-
   #if SCAN_MODE == SCAN_MODE_NONE
-    ack->size = 4;
-    ack->data[0] = received->rssi;
-    ack->data[1] = received->rssi_count;
-    ack->data[2] = received->rssi_sum & 0xFF;
-    ack->data[3] = (received->rssi_sum >> 8) & 0xFF;
-    rssi_sum += received->rssi_sum;
-    rssi_count += received->rssi_count;
-    // SEGGER_RTT_Write(0, (const char*)&(ack->data[0]), 1);
-  #else
-    ack->size = 5;
-    ack->data[1] = count;
-    ack->data[2] = received->rssi_count;
-    ack->data[3] = received->rssi_sum & 0xFF;
-    ack->data[4] = (received->rssi_sum >> 8) & 0xFF;
-    SEGGER_RTT_Write(0, (const char*)&(ack->data[0]), 5);
-
-    if (count == 10)// && channel == rx_payload.data[0])
-    {
-      // SEGGER_RTT_printf(0, "%d,%d,%d\n", channel, count, received->rssi);
-      // SEGGER_RTT_printf(0, "CSAT");
-      channelSwitchAckTime = systickGetTick();
-    }
+    static uint32_t rssi_sum;
+    static uint32_t rssi_count;
   #endif
+  void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
+  {
+    #if SCAN_MODE == SCAN_MODE_CHANNEL
+      ack->data[0] = channel;
+      channelSwitchAckTime = systickGetTick();
+    #endif
+    #if SCAN_MODE == SCAN_MODE_POWER
+      ack->data[0] = txpower;
+    #endif
+    #if SCAN_MODE == SCAN_MODE_DATARATE
+      ack->data[0] = datarate;
+    #endif
 
-}
+    #if SCAN_MODE == SCAN_MODE_NONE
+      ack->size = 4;
+      ack->data[1] = received->rssi_count;
+      ack->data[2] = received->rssi_sum & 0xFF;
+      ack->data[3] = (received->rssi_sum >> 8) & 0xFF;
+      rssi_sum += received->rssi_sum;
+      rssi_count += received->rssi_count;
+    #else
+      ack->size = 4;
+      ack->data[1] = received->rssi_count;
+      ack->data[2] = received->rssi_sum & 0xFF;
+      ack->data[3] = (received->rssi_sum >> 8) & 0xFF;
+      SEGGER_RTT_Write(0, (const char*)&(ack->data[0]), 4);
+    #endif
+
+  }
 #endif
 
 #if CFMODE == CFMODE_TX
-static unsigned int channel;
-static int count = 0;
-static EsbDatarate datarate;
-static int txpower;
+  static unsigned int channel;
+  static EsbDatarate datarate;
+  static int txpower;
 #endif
 
 int main()
@@ -113,10 +102,6 @@ int main()
 
   NRF_CLOCK->TASKS_HFCLKSTART = 1UL;
   while(!NRF_CLOCK->EVENTS_HFCLKSTARTED);
-
-#ifdef SEMIHOSTING
-  initialise_monitor_handles();
-#endif
 
   NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSTAT_SRC_Synth;
 
@@ -130,7 +115,6 @@ int main()
   NRF_GPIO->PIN_CNF[RADIO_PAEN_PIN] |= GPIO_PIN_CNF_DIR_Output | (GPIO_PIN_CNF_DRIVE_S0H1<<GPIO_PIN_CNF_DRIVE_Pos);
 
   channel = CF_CHANNEL;
-  count = 0;
   datarate = CF_DATARATE;
   txpower = CF_POWER;
 
@@ -206,9 +190,10 @@ EsbDatarate getNextDatarate(EsbDatarate dr)
 void mainloop()
 {
 #if CFMODE == CFMODE_TX
+  int i;
   EsbPacket packet;
   EsbPacket* ack;
-  for (int i = 0; i < 32; ++i) {
+  for (i = 0; i < 32; ++i) {
     packet.data[i] = 0x5;
   }
 #endif
@@ -225,31 +210,26 @@ void mainloop()
 
     #if CFMODE == CFMODE_RX
       #if SCAN_MODE == SCAN_MODE_CHANNEL
-        if (count == 10 && systickGetTick() >= channelSwitchAckTime + 50)
+        if (channelSwitchAckTime && systickGetTick() >= channelSwitchAckTime + 10)
         {
           channel = getNextChannel(channel);
           esbStopRx();
           esbSetChannel(channel);
           esbStartRx();
-          count = 0;
+          channelSwitchAckTime = 0;
         }
       #endif
       #if SCAN_MODE == SCAN_MODE_POWER
-        if (count == 10)
-        {
-            txpower = getNextPower(txpower);
-            esbSetTxPower(txpower);
-            count = 0;
-        }
+        txpower = getNextPower(txpower);
+        esbSetTxPower(txpower);
       #endif
       #if SCAN_MODE == SCAN_MODE_DATARATE
-        if (count == 10 && systickGetTick() >= channelSwitchAckTime + 50)
+        if (systickGetTick() >= datarateSwitchAckTime + 50)
         {
             datarate = getNextDatarate(datarate);
             esbStopRx();
             esbSetDatarate(datarate);
             esbStartRx();
-            count = 0;
         }
       #endif
       #if SCAN_MODE == SCAN_MODE_NONE
@@ -267,37 +247,22 @@ void mainloop()
       packet.pid = (packet.pid + 1) % 4;
       packet.size = 32;
       packet.data[0] = channel;
-      packet.data[1] = count;
       ack = esbSendPacket(&packet);
-        if (ack && ack->size)
-        {
-          if (ack->data[1] == count)
-          {
-            if (count == 10)
-            {
-              #if SCAN_MODE == SCAN_MODE_CHANNEL
-                channel = ack->data[0] + 1;
-                if (channel == 126) {
-                  channel = 0;
-                }
-                esbSetChannel(channel);
-              #endif
-              #if SCAN_MODE == SCAN_MODE_POWER
-                txpower = getNextPower(txpower);
-                esbSetTxPower(txpower);
-              #endif
-              #if SCAN_MODE == SCAN_MODE_DATARATE
-                datarate = getNextDatarate(datarate);
-                esbSetDatarate(datarate);
-              #endif
-              count = 0;
-            }
-            else
-            {
-              count += 1;
-            }
-          }
-        }
+      if (ack && ack->size)
+      {
+        #if SCAN_MODE == SCAN_MODE_CHANNEL
+          channel = getNextChannel(channel);
+          esbSetChannel(channel);
+        #endif
+        #if SCAN_MODE == SCAN_MODE_POWER
+          txpower = getNextPower(txpower);
+          esbSetTxPower(txpower);
+        #endif
+        #if SCAN_MODE == SCAN_MODE_DATARATE
+          datarate = getNextDatarate(datarate);
+          esbSetDatarate(datarate);
+        #endif
+      }
 
     #endif
 
