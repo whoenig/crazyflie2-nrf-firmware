@@ -7,7 +7,6 @@ from RTT import RTT
 rtt = RTT()
 
 p = pg.plot()
-# p.setXRange(0, 125)
 p.setYRange(-80, -30)
 p.setLabel('bottom', 'Time')
 p.setLabel('left', 'RSSI [dBM]')
@@ -25,22 +24,19 @@ starttime = time.time()
 
 # curve.setData(x = x, y = y)
 while True:
-	(datarate, count, rssi) = rtt.get("<BBB")
-	print("{},{},{}".format(datarate, count, rssi))
+	(datarate, rssi_count, rssi_sum) = rtt.get("<BBH")
+	print("{},{},{}".format(datarate, rssi_count, rssi_sum))
 
-	# x[datarate].append(datarate)
 	x[datarate].append(time.time() - starttime)
-	y[datarate].append(-rssi)
+	y[datarate].append(-rssi_sum / rssi_count)
 
-	if count == 0:
+	if datarate == 2:
 		for i in range(0,3):
-			if len(x[i]) > 500:
-				del x[i][0:len(x[i])-500]
-				del y[i][0:len(y[i])-500]
+			if len(x[i]) > 50:
+				del x[i][0:len(x[i])-50]
+				del y[i][0:len(y[i])-50]
 			curves[i].setData(x = x[i], y = y[i])
 
-	# if count == 10 and datarate == 2:
-		# break
 	pg.QtGui.QApplication.processEvents()
 
 pg.QtGui.QApplication.exec_()

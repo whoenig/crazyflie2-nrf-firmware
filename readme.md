@@ -34,7 +34,7 @@ python3 scanRTT.py
 This modes measures RSSI vs. channel (fixed power, and datarate).
 
 ```
-make SCAN_MODE=NONE CF_POWER=Neg20dBm CF_DATARATE=250K CFMODE=[TX,RX] [clean, cload]
+make SCAN_MODE=CHANNEL CF_POWER=Neg20dBm CF_DATARATE=250K CFMODE=[TX,RX] [clean, cload]
 python3 channelscanRTT.py
 ```
 
@@ -43,7 +43,7 @@ python3 channelscanRTT.py
 This modes measures RSSI vs. power (fixed channel, and datarate).
 
 ```
-make SCAN_MODE=NONE CHANNEL=100 CF_DATARATE=250K CFMODE=[TX,RX] [clean, cload]
+make SCAN_MODE=POWER CHANNEL=100 CF_DATARATE=250K CFMODE=[TX,RX] [clean, cload]
 python3 powerscanRTT.py
 ```
 
@@ -52,7 +52,7 @@ python3 powerscanRTT.py
 This modes measures RSSI vs. datarate (fixed channel, and power).
 
 ```
-make SCAN_MODE=NONE CHANNEL=100 CF_POWER=Neg20dBm CFMODE=[TX,RX] [clean, cload]
+make SCAN_MODE=DATARATE CHANNEL=100 CF_POWER=Neg20dBm CFMODE=[TX,RX] [clean, cload]
 python3 dataratescanRTT.py
 ```
 

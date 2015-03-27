@@ -55,6 +55,9 @@ static void mainloop(void);
   #if SCAN_MODE == SCAN_MODE_CHANNEL
     static int channelSwitchAckTime = 0;
   #endif
+  #if SCAN_MODE == SCAN_MODE_DATARATE
+    static int datarateSwitchAckTime = 0;
+  #endif
   #if SCAN_MODE == SCAN_MODE_NONE
     static uint32_t rssi_sum;
     static uint32_t rssi_count;
@@ -70,6 +73,7 @@ static void mainloop(void);
     #endif
     #if SCAN_MODE == SCAN_MODE_DATARATE
       ack->data[0] = datarate;
+      datarateSwitchAckTime = systickGetTick();
     #endif
 
     #if SCAN_MODE == SCAN_MODE_NONE
@@ -199,7 +203,9 @@ void mainloop()
 #endif
 
 #if CFMODE == CFMODE_RX
-  int lastPacket = systickGetTick();
+  #if SCAN_MODE == SCAN_MODE_NONE
+    int lastPacket = systickGetTick();
+  #endif
 #endif
 
   nrf_gpio_cfg_output(RADIO_PAEN_PIN);
@@ -224,12 +230,13 @@ void mainloop()
         esbSetTxPower(txpower);
       #endif
       #if SCAN_MODE == SCAN_MODE_DATARATE
-        if (systickGetTick() >= datarateSwitchAckTime + 50)
+        if (datarateSwitchAckTime && systickGetTick() >= datarateSwitchAckTime + 50)
         {
             datarate = getNextDatarate(datarate);
             esbStopRx();
             esbSetDatarate(datarate);
             esbStartRx();
+            datarateSwitchAckTime = 0;
         }
       #endif
       #if SCAN_MODE == SCAN_MODE_NONE
