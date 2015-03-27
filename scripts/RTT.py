@@ -32,6 +32,5 @@ class RTT:
 
     def get(self, fmt):
         size = struct.calcsize(fmt)
-        data = self.recv(3)
-        # return (0, 0, 0)
+        data = self.recv(size)
         return struct.unpack(fmt, data)

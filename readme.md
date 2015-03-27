@@ -11,11 +11,50 @@ Usage
 0. Clean: `make clean`
 0. Compile: `make CFMODE=RX` or `make CFMODE=TX`
 0. Press the button on the CF for 3 seconds until the two blue LEDs start to blink.
-0. Flash using Crazyradio: `make CFMODE=RX cload` or make `CFMODE=TX cload`
+0. Flash using Crazyradio: `make CFMODE=RX cload` or `make CFMODE=TX cload`
 0. Connect receiving Crazyflie via nrf Debug adapter and J-Link EDU to PC
 0. Run `./JLinkExe -device NRF51 -speed 4000 -if SWD` on the PC
 0. Run `python3 channelscanRTT.py` from the scripts folder
 0. Turn transmitting Crazyflie on
+
+Modes
+-----
+
+0. None
+
+This mode measures RSSI continously (fixed channel, power, and datarate). Results are averaged and sent via RTT to the PC.
+
+```
+make SCAN_MODE=NONE CF_CHANNEL=100 CF_POWER=Neg20dBm CF_DATARATE=250K CFMODE=[TX,RX] [clean, cload]
+python3 scanRTT.py
+```
+
+0. Channelscan
+
+This modes measures RSSI vs. channel (fixed power, and datarate).
+
+```
+make SCAN_MODE=NONE CF_POWER=Neg20dBm CF_DATARATE=250K CFMODE=[TX,RX] [clean, cload]
+python3 channelscanRTT.py
+```
+
+0. Powerscan
+
+This modes measures RSSI vs. power (fixed channel, and datarate).
+
+```
+make SCAN_MODE=NONE CHANNEL=100 CF_DATARATE=250K CFMODE=[TX,RX] [clean, cload]
+python3 powerscanRTT.py
+```
+
+0. Dataratescan
+
+This modes measures RSSI vs. datarate (fixed channel, and power).
+
+```
+make SCAN_MODE=NONE CHANNEL=100 CF_POWER=Neg20dBm CFMODE=[TX,RX] [clean, cload]
+python3 dataratescanRTT.py
+```
 
 Setup J-Link
 ------------

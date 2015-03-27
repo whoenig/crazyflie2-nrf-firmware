@@ -443,18 +443,19 @@ void esbSetChannel(unsigned int ch)
 {
   if (ch < 126) {
     channel = ch;
-    // NRF_RADIO->FREQUENCY = channel;
+    NRF_RADIO->FREQUENCY = channel;
     // esbReset();
   }
 
-  esbReset();
+  // esbReset();
 }
 
 void esbSetTxPower(int power)
 {
   txpower = power;
+  NRF_RADIO->TXPOWER = (txpower << RADIO_TXPOWER_TXPOWER_Pos);
 
-  esbReset();
+  //esbReset();
 }
 
 void esbSetAddress(uint64_t addr)

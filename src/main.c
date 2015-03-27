@@ -41,6 +41,11 @@
 #define CFMODE_RX 0
 #define CFMODE_TX 1
 
+#define SCAN_MODE_NONE     0
+#define SCAN_MODE_CHANNEL  1
+#define SCAN_MODE_POWER    2
+#define SCAN_MODE_DATARATE 3
+
 extern void  initialise_monitor_handles(void);
 
 #ifndef SEMIHOSTING
@@ -57,24 +62,42 @@ static int count = 0;
 static int channelSwitchAckTime;
 static EsbDatarate datarate;
 static int txpower;
+static int rssi_sum;
+static int rssi_count;
 void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
 {
   // int i;
   count = received->data[1];
 
-  ack->size = 3;
-  ack->data[0] = channel;
-  ack->data[1] = count;
-  ack->data[2] = received->rssi;
-  SEGGER_RTT_Write(0, (const char*)&(ack->data[0]), 3);
-  // SEGGER_RTT_printf(0, "R");
+  #if SCAN_MODE == SCAN_MODE_CHANNEL
+    ack->data[0] = channel;
+  #endif
+  #if SCAN_MODE == SCAN_MODE_POWER
+    ack->data[0] = txpower;
+  #endif
+  #if SCAN_MODE == SCAN_MODE_DATARATE
+    ack->data[0] = datarate;
+  #endif
 
-  if (count == 20)// && channel == rx_payload.data[0])
-  {
-    // SEGGER_RTT_printf(0, "%d,%d,%d\n", channel, count, received->rssi);
-    // SEGGER_RTT_printf(0, "CSAT");
-    channelSwitchAckTime = systickGetTick();
-  }
+  #if SCAN_MODE == SCAN_MODE_NONE
+    ack->size = 3;
+    ack->data[0] = received->rssi;
+    rssi_sum += received->rssi;
+    ++rssi_count;
+    // SEGGER_RTT_Write(0, (const char*)&(ack->data[0]), 1);
+  #else
+    ack->size = 3;
+    ack->data[1] = count;
+    ack->data[2] = received->rssi;
+    SEGGER_RTT_Write(0, (const char*)&(ack->data[0]), 3);
+
+    if (count == 10)// && channel == rx_payload.data[0])
+    {
+      // SEGGER_RTT_printf(0, "%d,%d,%d\n", channel, count, received->rssi);
+      // SEGGER_RTT_printf(0, "CSAT");
+      channelSwitchAckTime = systickGetTick();
+    }
+  #endif
 
 }
 #endif
@@ -125,9 +148,10 @@ int main()
 
   NRF_GPIO->PIN_CNF[RADIO_PAEN_PIN] |= GPIO_PIN_CNF_DIR_Output | (GPIO_PIN_CNF_DRIVE_S0H1<<GPIO_PIN_CNF_DRIVE_Pos);
 
-  channel = 0;
+  channel = CF_CHANNEL;
   count = 0;
-  datarate = esbDatarate250K;
+  datarate = CF_DATARATE;
+  txpower = CF_POWER;
 
   esbSetDatarate(datarate);
   esbSetChannel(channel);
@@ -156,6 +180,51 @@ void delayms(int delay)
   while (systickGetTick() < starttime + delay);
 }
 
+int getNextChannel(int ch)
+{
+  return (ch + 1) % 126;
+}
+
+int getNextPower(int power)
+{
+  switch(power)
+  {
+  case RADIO_TXPOWER_TXPOWER_Pos4dBm:
+    return RADIO_TXPOWER_TXPOWER_0dBm;
+  case RADIO_TXPOWER_TXPOWER_0dBm:
+    return RADIO_TXPOWER_TXPOWER_Neg4dBm;
+  case RADIO_TXPOWER_TXPOWER_Neg4dBm:
+    return RADIO_TXPOWER_TXPOWER_Neg8dBm;
+  case RADIO_TXPOWER_TXPOWER_Neg8dBm:
+    return RADIO_TXPOWER_TXPOWER_Neg12dBm;
+  case RADIO_TXPOWER_TXPOWER_Neg12dBm:
+    return RADIO_TXPOWER_TXPOWER_Neg16dBm;
+  case RADIO_TXPOWER_TXPOWER_Neg16dBm:
+    return RADIO_TXPOWER_TXPOWER_Neg20dBm;
+  case RADIO_TXPOWER_TXPOWER_Neg20dBm:
+    return RADIO_TXPOWER_TXPOWER_Neg30dBm;
+  case RADIO_TXPOWER_TXPOWER_Neg30dBm:
+    return RADIO_TXPOWER_TXPOWER_Pos4dBm;
+  }
+  return RADIO_TXPOWER_TXPOWER_Pos4dBm;
+}
+
+EsbDatarate getNextDatarate(EsbDatarate dr)
+{
+  switch (dr)
+  {
+    case esbDatarate250K:
+      return esbDatarate1M;
+    case esbDatarate1M:
+      return esbDatarate2M;
+    case esbDatarate2M:
+      return esbDatarate250K;
+  }
+  return esbDatarate250K;
+}
+
+
+
 void mainloop()
 {
 #if CFMODE == CFMODE_TX
@@ -165,6 +234,8 @@ void mainloop()
   packet.data[1] = 0xFE;
   packet.size = 1;
 #endif
+
+  int lastPacket = systickGetTick();
 
   nrf_gpio_cfg_output(RADIO_PAEN_PIN);
 
@@ -177,80 +248,119 @@ void mainloop()
       nrf_gpio_pin_set(RADIO_PAEN_PIN);
 
       #if CFMODE == CFMODE_RX
-        if (count == 20 && systickGetTick() >= channelSwitchAckTime + 50)
-        {
-          count = 0;
-          channel += 1;
-          if (channel == 126) {
-            // switch (datarate)
-            // {
-            //   case esbDatarate250K:
-            //     datarate = esbDatarate1M;
-            //     break;
-            //   case esbDatarate1M:
-            //     datarate = esbDatarate2M;
-            //     break;
-            //   case esbDatarate2M:
-            //     datarate = esbDatarate250K;
-            //     switch(txpower)
-            //     {
-            //     case RADIO_TXPOWER_TXPOWER_Pos4dBm:
-            //       txpower = RADIO_TXPOWER_TXPOWER_0dBm;
-            //       break;
-            //     case RADIO_TXPOWER_TXPOWER_0dBm:
-            //       txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm;
-            //       break;
-            //     }
-            //     esbSetTxPower(txpower);
-            //     break;
-            // }
-            // esbSetDatarate(datarate);
-
-            switch(txpower)
-            {
-            case RADIO_TXPOWER_TXPOWER_Pos4dBm:
-              txpower = RADIO_TXPOWER_TXPOWER_0dBm;
-              break;
-            case RADIO_TXPOWER_TXPOWER_0dBm:
-              txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm;
-              break;
-            case RADIO_TXPOWER_TXPOWER_Neg4dBm:
-              txpower = RADIO_TXPOWER_TXPOWER_Neg8dBm;
-              break;
-            case RADIO_TXPOWER_TXPOWER_Neg8dBm:
-              txpower = RADIO_TXPOWER_TXPOWER_Neg12dBm;
-              break;
-            case RADIO_TXPOWER_TXPOWER_Neg12dBm:
-              txpower = RADIO_TXPOWER_TXPOWER_Neg16dBm;
-              break;
-            case RADIO_TXPOWER_TXPOWER_Neg16dBm:
-              txpower = RADIO_TXPOWER_TXPOWER_Neg20dBm;
-              break;
-            case RADIO_TXPOWER_TXPOWER_Neg20dBm:
-              txpower = RADIO_TXPOWER_TXPOWER_Neg30dBm;
-              break;
-            case RADIO_TXPOWER_TXPOWER_Neg30dBm:
-              txpower = RADIO_TXPOWER_TXPOWER_Pos4dBm;
-              break;
-            }
-            esbSetTxPower(txpower);
-
-            channel = 0;
+        #if SCAN_MODE == SCAN_MODE_CHANNEL
+          if (count == 10 && systickGetTick() >= channelSwitchAckTime + 50)
+          {
+            channel = getNextChannel(channel);
+            esbStopRx();
+            esbSetChannel(channel);
+            esbStartRx();
+            count = 0;
           }
-          // esbReset();
-          // esbStartRx();
-          esbStopRx();
-          // delayms(250);
-          esbSetChannel(channel);
-          // delayms(250);
-          esbStartRx();
-          // SEGGER_RTT_printf(0, "Channel: %d\n", channel);
-        }
-        //if (esbIsRxPacket())
-        //{
-        //  EsbPacket* packet = esbGetRxPacket();
-        //  esbReleaseRxPacket(packet);
-        //}
+        #endif
+        #if SCAN_MODE == SCAN_MODE_POWER
+          if (count == 10)
+          {
+              txpower = getNextPower(txpower);
+              esbSetTxPower(txpower);
+              count = 0;
+          }
+        #endif
+        #if SCAN_MODE == SCAN_MODE_DATARATE
+          if (count == 10 && systickGetTick() >= channelSwitchAckTime + 50)
+          {
+              datarate = getNextDatarate(datarate);
+              esbStopRx();
+              esbSetDatarate(datarate);
+              esbStartRx();
+              count = 0;
+          }
+        #endif
+        #if SCAN_MODE == SCAN_MODE_NONE
+          if (rssi_count > 0 && systickGetTick() >= lastPacket + 100)
+          {
+            int rssi = rssi_sum / rssi_count;
+            SEGGER_RTT_Write(0, (const char*)&(rssi), 1);
+            rssi_count = 0;
+            rssi_sum = 0;
+            lastPacket = systickGetTick();
+          }
+        #endif
+
+        // if (count == 20 && systickGetTick() >= channelSwitchAckTime + 50)
+        // {
+        //   count = 0;
+        //   channel += 1;
+        //   if (channel == 126) {
+        //     // switch (datarate)
+        //     // {
+        //     //   case esbDatarate250K:
+        //     //     datarate = esbDatarate1M;
+        //     //     break;
+        //     //   case esbDatarate1M:
+        //     //     datarate = esbDatarate2M;
+        //     //     break;
+        //     //   case esbDatarate2M:
+        //     //     datarate = esbDatarate250K;
+        //     //     switch(txpower)
+        //     //     {
+        //     //     case RADIO_TXPOWER_TXPOWER_Pos4dBm:
+        //     //       txpower = RADIO_TXPOWER_TXPOWER_0dBm;
+        //     //       break;
+        //     //     case RADIO_TXPOWER_TXPOWER_0dBm:
+        //     //       txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm;
+        //     //       break;
+        //     //     }
+        //     //     esbSetTxPower(txpower);
+        //     //     break;
+        //     // }
+        //     // esbSetDatarate(datarate);
+
+        //     switch(txpower)
+        //     {
+        //     case RADIO_TXPOWER_TXPOWER_Pos4dBm:
+        //       txpower = RADIO_TXPOWER_TXPOWER_0dBm;
+        //       break;
+        //     case RADIO_TXPOWER_TXPOWER_0dBm:
+        //       txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm;
+        //       break;
+        //     case RADIO_TXPOWER_TXPOWER_Neg4dBm:
+        //       txpower = RADIO_TXPOWER_TXPOWER_Neg8dBm;
+        //       break;
+        //     case RADIO_TXPOWER_TXPOWER_Neg8dBm:
+        //       txpower = RADIO_TXPOWER_TXPOWER_Neg12dBm;
+        //       break;
+        //     case RADIO_TXPOWER_TXPOWER_Neg12dBm:
+        //       txpower = RADIO_TXPOWER_TXPOWER_Neg16dBm;
+        //       break;
+        //     case RADIO_TXPOWER_TXPOWER_Neg16dBm:
+        //       txpower = RADIO_TXPOWER_TXPOWER_Neg20dBm;
+        //       break;
+        //     case RADIO_TXPOWER_TXPOWER_Neg20dBm:
+        //       txpower = RADIO_TXPOWER_TXPOWER_Neg30dBm;
+        //       break;
+        //     case RADIO_TXPOWER_TXPOWER_Neg30dBm:
+        //       txpower = RADIO_TXPOWER_TXPOWER_Pos4dBm;
+        //       break;
+        //     }
+        //     esbSetTxPower(txpower);
+
+        //     channel = 0;
+        //   }
+        //   // esbReset();
+        //   // esbStartRx();
+        //   esbStopRx();
+        //   // delayms(250);
+        //   esbSetChannel(channel);
+        //   // delayms(250);
+        //   esbStartRx();
+        //   // SEGGER_RTT_printf(0, "Channel: %d\n", channel);
+        // }
+        // //if (esbIsRxPacket())
+        // //{
+        // //  EsbPacket* packet = esbGetRxPacket();
+        // //  esbReleaseRxPacket(packet);
+        // //}
       #endif
       #if CFMODE == CFMODE_TX
         packet.pid = (packet.pid + 1) % 4;
@@ -258,73 +368,104 @@ void mainloop()
         packet.data[0] = channel;
         packet.data[1] = count;
         ack = esbSendPacket(&packet);
-        if (ack && ack->size)
-        {
-          if (ack->data[1] == count)
+          if (ack && ack->size)
           {
-            if (count == 20)
+            if (ack->data[1] == count)
             {
-              channel = ack->data[0] + 1;
-              if (channel == 126) {
-                // switch (datarate)
-                // {
-                //   case esbDatarate250K:
-                //     datarate = esbDatarate1M;
-                //     break;
-                //   case esbDatarate1M:
-                //     datarate = esbDatarate2M;
-                //     break;
-                //   case esbDatarate2M:
-                //     datarate = esbDatarate250K;
-                //     break;
-                // }
-                // esbSetDatarate(datarate);
-
-                switch(txpower)
-                {
-                case RADIO_TXPOWER_TXPOWER_Pos4dBm:
-                  txpower = RADIO_TXPOWER_TXPOWER_0dBm;
-                  break;
-                case RADIO_TXPOWER_TXPOWER_0dBm:
-                  txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm;
-                  break;
-                case RADIO_TXPOWER_TXPOWER_Neg4dBm:
-                  txpower = RADIO_TXPOWER_TXPOWER_Neg8dBm;
-                  break;
-                case RADIO_TXPOWER_TXPOWER_Neg8dBm:
-                  txpower = RADIO_TXPOWER_TXPOWER_Neg12dBm;
-                  break;
-                case RADIO_TXPOWER_TXPOWER_Neg12dBm:
-                  txpower = RADIO_TXPOWER_TXPOWER_Neg16dBm;
-                  break;
-                case RADIO_TXPOWER_TXPOWER_Neg16dBm:
-                  txpower = RADIO_TXPOWER_TXPOWER_Neg20dBm;
-                  break;
-                case RADIO_TXPOWER_TXPOWER_Neg20dBm:
-                  txpower = RADIO_TXPOWER_TXPOWER_Neg30dBm;
-                  break;
-                case RADIO_TXPOWER_TXPOWER_Neg30dBm:
-                  txpower = RADIO_TXPOWER_TXPOWER_Pos4dBm;
-                  break;
-                }
-                esbSetTxPower(txpower);
-
-                channel = 0;
+              if (count == 10)
+              {
+                #if SCAN_MODE == SCAN_MODE_CHANNEL
+                  channel = ack->data[0] + 1;
+                  if (channel == 126) {
+                    channel = 0;
+                  }
+                  esbSetChannel(channel);
+                #endif
+                #if SCAN_MODE == SCAN_MODE_POWER
+                  txpower = getNextPower(txpower);
+                  esbSetTxPower(txpower);
+                #endif
+                #if SCAN_MODE == SCAN_MODE_DATARATE
+                  datarate = getNextDatarate(datarate);
+                  esbSetDatarate(datarate);
+                #endif
+                count = 0;
               }
-              esbSetChannel(channel);
-              count = 0;
-            }
-            else
-            {
-              count += 1;
+              else
+              {
+                count += 1;
+              }
             }
           }
-          //SEGGER_RTT_printf(0, "%d\n", ack->data[1]);
-        }
-        // else
+        // #endif
+
+        // if (ack && ack->size)
         // {
-        //   SEGGER_RTT_printf(0, "-");
+        //   if (ack->data[1] == count)
+        //   {
+        //     if (count == 20)
+        //     {
+        //       channel = ack->data[0] + 1;
+        //       if (channel == 126) {
+        //         // switch (datarate)
+        //         // {
+        //         //   case esbDatarate250K:
+        //         //     datarate = esbDatarate1M;
+        //         //     break;
+        //         //   case esbDatarate1M:
+        //         //     datarate = esbDatarate2M;
+        //         //     break;
+        //         //   case esbDatarate2M:
+        //         //     datarate = esbDatarate250K;
+        //         //     break;
+        //         // }
+        //         // esbSetDatarate(datarate);
+
+        //         switch(txpower)
+        //         {
+        //         case RADIO_TXPOWER_TXPOWER_Pos4dBm:
+        //           txpower = RADIO_TXPOWER_TXPOWER_0dBm;
+        //           break;
+        //         case RADIO_TXPOWER_TXPOWER_0dBm:
+        //           txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm;
+        //           break;
+        //         case RADIO_TXPOWER_TXPOWER_Neg4dBm:
+        //           txpower = RADIO_TXPOWER_TXPOWER_Neg8dBm;
+        //           break;
+        //         case RADIO_TXPOWER_TXPOWER_Neg8dBm:
+        //           txpower = RADIO_TXPOWER_TXPOWER_Neg12dBm;
+        //           break;
+        //         case RADIO_TXPOWER_TXPOWER_Neg12dBm:
+        //           txpower = RADIO_TXPOWER_TXPOWER_Neg16dBm;
+        //           break;
+        //         case RADIO_TXPOWER_TXPOWER_Neg16dBm:
+        //           txpower = RADIO_TXPOWER_TXPOWER_Neg20dBm;
+        //           break;
+        //         case RADIO_TXPOWER_TXPOWER_Neg20dBm:
+        //           txpower = RADIO_TXPOWER_TXPOWER_Neg30dBm;
+        //           break;
+        //         case RADIO_TXPOWER_TXPOWER_Neg30dBm:
+        //           txpower = RADIO_TXPOWER_TXPOWER_Pos4dBm;
+        //           break;
+        //         }
+        //         esbSetTxPower(txpower);
+
+        //         channel = 0;
+        //       }
+        //       esbSetChannel(channel);
+        //       count = 0;
+        //     }
+        //     else
+        //     {
+        //       count += 1;
+        //     }
+        //   }
+        //   //SEGGER_RTT_printf(0, "%d\n", ack->data[1]);
         // }
+        // // else
+        // // {
+        // //   SEGGER_RTT_printf(0, "-");
+        // // }
       #endif
     }
     else
