@@ -53,8 +53,10 @@ static int count = 0;
 static int channelSwitchAckTime;
 static EsbDatarate datarate;
 static int txpower;
-static int rssi_sum;
-static int rssi_count;
+  #if SCAN_MODE == SCAN_MODE_NONE
+  static uint32_t rssi_sum;
+  static uint32_t rssi_count;
+  #endif
 void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
 {
   // int i;
@@ -71,16 +73,21 @@ void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
   #endif
 
   #if SCAN_MODE == SCAN_MODE_NONE
-    ack->size = 3;
+    ack->size = 4;
     ack->data[0] = received->rssi;
-    rssi_sum += received->rssi;
-    ++rssi_count;
+    ack->data[1] = received->rssi_count;
+    ack->data[2] = received->rssi_sum & 0xFF;
+    ack->data[3] = (received->rssi_sum >> 8) & 0xFF;
+    rssi_sum += received->rssi_sum;
+    rssi_count += received->rssi_count;
     // SEGGER_RTT_Write(0, (const char*)&(ack->data[0]), 1);
   #else
-    ack->size = 3;
+    ack->size = 5;
     ack->data[1] = count;
-    ack->data[2] = received->rssi;
-    SEGGER_RTT_Write(0, (const char*)&(ack->data[0]), 3);
+    ack->data[2] = received->rssi_count;
+    ack->data[3] = received->rssi_sum & 0xFF;
+    ack->data[4] = (received->rssi_sum >> 8) & 0xFF;
+    SEGGER_RTT_Write(0, (const char*)&(ack->data[0]), 5);
 
     if (count == 10)// && channel == rx_payload.data[0])
     {
@@ -201,9 +208,9 @@ void mainloop()
 #if CFMODE == CFMODE_TX
   EsbPacket packet;
   EsbPacket* ack;
-  packet.data[0] = 0xCA;
-  packet.data[1] = 0xFE;
-  packet.size = 1;
+  for (int i = 0; i < 32; ++i) {
+    packet.data[i] = 0x5;
+  }
 #endif
 
 #if CFMODE == CFMODE_RX
@@ -258,7 +265,7 @@ void mainloop()
     #endif
     #if CFMODE == CFMODE_TX
       packet.pid = (packet.pid + 1) % 4;
-      packet.size = 16;
+      packet.size = 32;
       packet.data[0] = channel;
       packet.data[1] = count;
       ack = esbSendPacket(&packet);

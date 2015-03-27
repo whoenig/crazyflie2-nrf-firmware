@@ -48,6 +48,8 @@ typedef struct esbPacket_s {
    * from uint32_t to uint8_t without lose of precision */
   uint8_t rssi;
   unsigned int crc;
+  uint16_t rssi_sum;
+  uint8_t rssi_count;
 } EsbPacket;
 
 typedef enum esbDatarate_e { esbDatarate250K=0,
