@@ -48,6 +48,7 @@ typedef struct esbPacket_s {
    * from uint32_t to uint8_t without lose of precision */
   uint8_t rssi;
   unsigned int crc;
+  uint8_t pipe;
 } EsbPacket;
 
 typedef enum esbDatarate_e { esbDatarate250K=0,
@@ -72,7 +73,7 @@ void esbSetPacketReceivedHandler(esbPacketReceivedHandler_t handler);
 void esbStartRx();
 void esbStopRx();
 
-EsbPacket* esbSendPacket(EsbPacket* packet);
+EsbPacket* esbSendPacket(EsbPacket* packet, uint8_t pipe);
 
 /* Set datarate */
 void esbSetDatarate(EsbDatarate datarate);
@@ -87,6 +88,7 @@ void esbSetTxPower(int power);
 void esbSetContwave(bool enable);
 
 /* Set the address of the radio */
-void esbSetAddress(uint64_t address);
+void esbSetAddress0(uint64_t address); // pipe0
+void esbSetAddress1(uint64_t address); // pipe1
 
 #endif //__ESB_H__

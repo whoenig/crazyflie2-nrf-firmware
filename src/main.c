@@ -47,6 +47,17 @@
 
 static void mainloop(void);
 
+enum
+{
+  PIPE_CF = 0,
+  PIPE_PC = 1,
+};
+
+enum
+{
+  CMD_CLOCKSYNC = 1,
+};
+
 #if CFMODE == CFMODE_RX
 static unsigned int channel;
 static int count = 0;
@@ -89,6 +100,24 @@ void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
       channelSwitchAckTime = systickGetTick();
     }
   #endif
+
+  if (received->pipe == PIPE_PC)
+  {
+    switch(received->data[0])
+    {
+      case CMD_CLOCKSYNC:
+        // ToDo: reset clocks here!
+        LED_OFF();
+        break;
+    }
+  }
+  else if (received->pipe == PIPE_CF)
+  {
+    ack->size = 1;
+    ack->data[0] = received->rssi;
+    // ToDo: handle any messages from the swarm here
+    //       This is part of an interrupt handler, so keep it short!
+  }
 
 }
 #endif
@@ -261,7 +290,7 @@ void mainloop()
       packet.size = 16;
       packet.data[0] = channel;
       packet.data[1] = count;
-      ack = esbSendPacket(&packet);
+      ack = esbSendPacket(&packet, PIPE_CF);
         if (ack && ack->size)
         {
           if (ack->data[1] == count)

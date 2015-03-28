@@ -41,9 +41,10 @@ static unsigned int channel = 2;
 static int datarate = esbDatarate2M;
 static int txpower = RADIO_TXPOWER_TXPOWER_0dBm;
 static bool contwave = false;
-static uint64_t address = 0xE7E7E7E7E7ULL;
+static uint64_t address0 = 0xE7E7E7E7E7ULL;
+static uint64_t address1 = 0xE7E7E7E7E8ULL;
 
-static enum {doNothing, doTx, doRx, doPtxTx, doPtxAck} rs;      //Radio state
+static enum {doNothing, doAck, doRx, doPtxTx, doPtxAck} rs;      //Radio state
 
 static EsbPacket recvPacket;
 static EsbPacket ackPacket;
@@ -95,8 +96,11 @@ static bool isRetry(EsbPacket *pk)
 }
 
 // Handles the queue
-static void setupTx(bool retry) {
+static void setupAck(bool retry) {
   static EsbPacket * lastSentPacket;
+
+  // Ack to the sender
+  NRF_RADIO->TXADDRESS = NRF_RADIO->RXMATCH;
 
   if (retry) {
     NRF_RADIO->PACKETPTR = (uint32_t)lastSentPacket;
@@ -117,7 +121,7 @@ static void setupTx(bool retry) {
   //After being disabled the radio will automatically send the ACK
   NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
   NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_TXEN_Msk;
-  rs = doTx;
+  rs = doAck;
   NRF_RADIO->TASKS_DISABLE = 1UL;
 }
 
@@ -159,19 +163,20 @@ void esbInterruptHandler()
       pk = &recvPacket;
       pk->rssi = (uint8_t) NRF_RADIO->RSSISAMPLE;
       pk->crc = NRF_RADIO->RXCRC;
+      pk->pipe = NRF_RADIO->RXMATCH;
 
       // If this packet is a retry, send the same ACK again
       if (isRetry(pk)) {
-        setupTx(true);
+        setupAck(true);
         // SEGGER_RTT_printf(0, "D");
         return;
       }
 
       // Good packet received, yea!
-      setupTx(false);
+      setupAck(false);
 
       break;
-    case doTx:
+    case doAck:
       //Setup RX for next packet
       setupRx();
       break;
@@ -251,12 +256,13 @@ void esbInit()
 
   // Radio address config
   // Using logical address 0 so only BASE0 and PREFIX0 & 0xFF are used
-  NRF_RADIO->PREFIX0 = 0xC4C3C200UL | (bytewise_bitswap(address >> 32) & 0xFF);  // Prefix byte of addresses 3 to 0
-  NRF_RADIO->PREFIX1 = 0xC5C6C7C8UL;  // Prefix byte of addresses 7 to 4
-  NRF_RADIO->BASE0   = bytewise_bitswap((uint32_t)address);  // Base address for prefix 0
-  NRF_RADIO->BASE1   = 0x00C2C2C2UL;  // Base address for prefix 1-7
+  NRF_RADIO->PREFIX0 = (bytewise_bitswap(address0 >> 32) & 0xFF) |
+                      ((bytewise_bitswap(address1 >> 32) & 0xFF) << 8);  // Prefix byte of addresses 3 to 0
+  // NRF_RADIO->PREFIX1 = 0xC5C6C7C8UL;  // Prefix byte of addresses 7 to 4
+  NRF_RADIO->BASE0   = bytewise_bitswap((uint32_t)address0);  // Base address for prefix 0
+  NRF_RADIO->BASE1   = bytewise_bitswap((uint32_t)address1);  // Base address for prefix 1 to 7
   NRF_RADIO->TXADDRESS = 0x00UL;      // Set device address 0 to use when transmitting
-  NRF_RADIO->RXADDRESSES = 0x01UL;    // Enable device address 0 to use which receiving
+  NRF_RADIO->RXADDRESSES = 0x03UL;    // Enable device address 0 and 1 to use which receiving
 
   // Packet configuration
   NRF_RADIO->PCNF0 = (PACKET0_S1_SIZE << RADIO_PCNF0_S1LEN_Pos) |
@@ -350,11 +356,12 @@ void esbStopRx()
   while(NRF_RADIO->EVENTS_DISABLED == 0);
 }
 
-EsbPacket* esbSendPacket(EsbPacket* packet)
+EsbPacket* esbSendPacket(EsbPacket* packet, uint8_t pipe)
 {
   receivedAck = false;
   int startTime = systickGetTick();
 
+  NRF_RADIO->TXADDRESS = pipe;
   NRF_RADIO->PACKETPTR = (uint32_t)packet;
 
   // start transmitting after task is disabled
@@ -458,9 +465,16 @@ void esbSetTxPower(int power)
   //esbReset();
 }
 
-void esbSetAddress(uint64_t addr)
+void esbSetAddress0(uint64_t addr)
 {
-  address = addr;
+  address0 = addr;
+
+  esbReset();
+}
+
+void esbSetAddress1(uint64_t addr)
+{
+  address1 = addr;
 
   esbReset();
 }
