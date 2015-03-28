@@ -62,8 +62,13 @@ static void mainloop(void);
     static int powerSwitchAckTime = 0;
   #endif
   #if SCAN_MODE == SCAN_MODE_NONE
-    static uint32_t rssi_sum;
-    static uint32_t rssi_count;
+    struct resultType
+    {
+      uint32_t rssi_count;
+      uint32_t rssi_sum;
+    };
+    static struct resultType result = {};
+
   #endif
   void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
   {
@@ -85,8 +90,8 @@ static void mainloop(void);
       ack->data[1] = received->rssi_count;
       ack->data[2] = received->rssi_sum & 0xFF;
       ack->data[3] = (received->rssi_sum >> 8) & 0xFF;
-      rssi_sum += received->rssi_sum;
-      rssi_count += received->rssi_count;
+      result.rssi_sum += received->rssi_sum;
+      result.rssi_count += received->rssi_count;
     #else
       ack->size = 4;
       ack->data[1] = received->rssi_count;
@@ -248,12 +253,11 @@ void mainloop()
         }
       #endif
       #if SCAN_MODE == SCAN_MODE_NONE
-        if (rssi_count > 0 && systickGetTick() >= lastPacket + 100)
+        if (result.rssi_count > 0 && systickGetTick() >= lastPacket + 100)
         {
-          int rssi = rssi_sum / rssi_count;
-          SEGGER_RTT_Write(0, (const char*)&(rssi), 1);
-          rssi_count = 0;
-          rssi_sum = 0;
+          SEGGER_RTT_Write(0, (const char*)&(result), sizeof(result));
+          result.rssi_count = 0;
+          result.rssi_sum = 0;
           lastPacket = systickGetTick();
         }
       #endif
