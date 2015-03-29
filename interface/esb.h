@@ -43,12 +43,10 @@ typedef struct esbPacket_s {
     };
     uint8_t data[32];
   } __attribute__((packed));
-  /* Written by the radio interrupt routine */
-  /* Since the value of the RSSI sample can only be between ~[0, 100] we down cast
-   * from uint32_t to uint8_t without lose of precision */
-  uint8_t rssi;
   unsigned int crc;
   uint8_t pipe;
+  uint16_t rssi_sum;
+  uint8_t rssi_count;
 } EsbPacket;
 
 typedef enum esbDatarate_e { esbDatarate250K=0,

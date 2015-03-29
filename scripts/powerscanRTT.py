@@ -7,7 +7,6 @@ from RTT import RTT
 rtt = RTT()
 
 p = pg.plot()
-# p.setXRange(0, 125)
 p.setYRange(-80, -30)
 p.setLabel('bottom', 'Time')
 p.setLabel('left', 'RSSI [dBM]')
@@ -29,7 +28,7 @@ curves.append(p.plot(pen = "w", name = "-30dBm"))
 starttime = time.time()
 
 while True:
-	(power, count, rssi) = rtt.get("<BBB")
+	(power, rssi_count, rssi_sum) = rtt.get("<BBH")
 	if power == 0x04:
 		pos = 0
 	elif power == 0x00:
@@ -47,11 +46,12 @@ while True:
 	elif power == 0xD8:
 		pos = 7
 
-	print("{},{},{}".format(pos, count, rssi))
+	print("{},{},{}".format(pos, rssi_count, rssi_sum))
 
-	if count == 0:
-		x[pos].append(time.time() - starttime)
-		y[pos].append(-rssi)
+	x[pos].append(time.time() - starttime)
+	y[pos].append(-rssi_sum / rssi_count)
+
+	if pos == 7:
 		for i in range(0,8):
 			if len(x[i]) > 100:
 				del x[i][0:len(x[i])-100]

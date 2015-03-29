@@ -51,6 +51,10 @@ static EsbPacket ackPacket;
 static esbPacketReceivedHandler_t packetReceivedHandler;
 static bool receivedAck = false;
 
+static uint16_t rssi_sum = 0;
+static uint8_t rssi_count = 0;
+static bool addressmatch = false;
+
 /* helper functions */
 
 static uint32_t swap_bits(uint32_t inp)
@@ -155,15 +159,23 @@ void esbInterruptHandler()
       // SEGGER_RTT_printf(0, "R");
       //Wrong CRC packet are dropped
       if (!NRF_RADIO->CRCSTATUS) {
+        rssi_sum = 0;
+        rssi_count = 0;
+        addressmatch = false;
         NRF_RADIO->TASKS_START = 1UL;
         // SEGGER_RTT_printf(0, "C");
         return;
       }
 
       pk = &recvPacket;
-      pk->rssi = (uint8_t) NRF_RADIO->RSSISAMPLE;
       pk->crc = NRF_RADIO->RXCRC;
       pk->pipe = NRF_RADIO->RXMATCH;
+      pk->rssi_sum = rssi_sum;
+      pk->rssi_count = rssi_count;
+
+      rssi_sum = 0;
+      rssi_count = 0;
+      addressmatch = false;
 
       // If this packet is a retry, send the same ACK again
       if (isRetry(pk)) {
@@ -206,6 +218,27 @@ void esbInterruptHandler()
       break;
     }
   }
+
+  if(NRF_RADIO->EVENTS_RSSIEND)
+  {
+    NRF_RADIO->EVENTS_RSSIEND = 0; // clear interrupt
+
+    // only use the sample if we are still in RX mode
+    if (addressmatch && NRF_RADIO->STATE == 3) //Rx
+    {
+      rssi_sum += NRF_RADIO->RSSISAMPLE;
+      ++rssi_count;
+      // restart the task to get another sample
+      NRF_RADIO->TASKS_RSSISTART = 1;
+    }
+  }
+
+  if(NRF_RADIO->EVENTS_ADDRESS)
+  {
+    NRF_RADIO->EVENTS_ADDRESS = 0; // clear interrupt
+    addressmatch = true;
+  }
+
 }
 
 
@@ -282,7 +315,9 @@ void esbInit()
   NRF_RADIO->CRCPOLY = 0x11021UL;     // CRC poly: x^16+x^12^x^5+1
 
   // Enable interrupt for end event
-  NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk;
+  NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk |
+                        RADIO_INTENSET_RSSIEND_Msk |
+                        RADIO_INTENSET_ADDRESS_Msk;
 
   // Set all shorts so that RSSI is measured and only END is required interrupt
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk;
@@ -391,8 +426,8 @@ EsbPacket* esbSendPacket(EsbPacket* packet, uint8_t pipe)
 
   // SEGGER_RTT_printf(0, "%d\n", NRF_RADIO->STATE);
 
-  // wait 10ms max
-  while (startTime + 10 >= systickGetTick()) {
+  // wait 2ms max
+  while (startTime + 2 >= systickGetTick()) {
     if (receivedAck) {
       return &recvPacket;
     }

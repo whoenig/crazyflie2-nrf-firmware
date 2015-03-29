@@ -47,7 +47,10 @@ static int txpower = CF_POWER;
 
 static int num_nbrs = 0; // Number of neighbors
 static int nbr_flag = 0;
-static int RSSI_Nbr[CF_TOTALNUM];
+struct {
+  uint32_t rssi_count;
+  uint32_t rssi_sum;
+} RSSI_Nbr[CF_TOTALNUM];
 /*
 received->data[] contains:
 [0] = ID
@@ -66,6 +69,8 @@ static const int DATASHARE_TX_TIME = 200; //ms
 
 void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
 {
+  uint8_t nbr;
+
   if (received->pipe == PIPE_PC)
   {
     switch(crazy_state)
@@ -90,10 +95,9 @@ void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
     switch(crazy_state)
     {
       case signalRx: // Extract ID, RSSI from MSG. Filter RSSI and store in array. Check for number of neighbors.
-        if(RSSI_Nbr[received->data[0]]==0)
-          RSSI_Nbr[received->data[0]] = received->rssi;
-        else
-          RSSI_Nbr[received->data[0]] = (RSSI_Nbr[received->data[0]] + received->rssi)/2;
+        nbr = received->data[0];
+        RSSI_Nbr[nbr].rssi_count += received->rssi_count;
+        RSSI_Nbr[nbr].rssi_sum += received->rssi_sum;
         break;
       case dataShareRx: // ToDo: Implement apt functionality here
         break;
@@ -111,10 +115,6 @@ int main()
   NRF_CLOCK->TASKS_HFCLKSTART = 1UL;
   while(!NRF_CLOCK->EVENTS_HFCLKSTARTED);
 
-#ifdef SEMIHOSTING
-  initialise_monitor_handles();
-#endif
-
   NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSTAT_SRC_Synth;
 
   NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
@@ -129,7 +129,10 @@ int main()
   crazy_state = waitToSync;
   
   for(i = 0; i < totalnum; i++)
-    RSSI_Nbr[i] = 0;
+  {
+    RSSI_Nbr[i].rssi_sum = 0;
+    RSSI_Nbr[i].rssi_count = 0;
+  }
 
   esbSetDatarate(datarate);
   esbSetChannel(channel);
@@ -159,7 +162,6 @@ void delayms(int delay)
 void mainloop()
 {
   EsbPacket packet;
-  EsbPacket* ack;
   int i = 0; 
 
   nrf_gpio_cfg_output(RADIO_PAEN_PIN);
@@ -197,7 +199,7 @@ void mainloop()
             nbr_flag = 1;
             for (i = 0; i < totalnum; i++)
             {
-              if(RSSI_Nbr[i]!=0)
+              if(RSSI_Nbr[i].rssi_count!=0)
                 num_nbrs++;
             }
           }
@@ -215,7 +217,7 @@ void mainloop()
             nbr_flag = 1;
             for (i = 0; i < totalnum; i++)
             {
-              if(RSSI_Nbr[i]!=0)
+              if(RSSI_Nbr[i].rssi_count!=0)
                 num_nbrs++;
             }
           }
@@ -240,7 +242,7 @@ void mainloop()
         packet.data[0] = ID;
         packet.size = 1;
         packet.pid = (packet.pid + 1) % 4;        
-        ack = esbSendPacket(&packet, PIPE_CF);          
+        esbSendPacket(&packet, PIPE_CF);          
         break;
       case dataShareTx: // ToDo
         break;

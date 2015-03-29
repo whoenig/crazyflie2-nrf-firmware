@@ -20,11 +20,11 @@ curve = p.plot()
 starttime = time.time()
 
 while True:
-	(rssi,) = rtt.get("<B")
-	print("{}".format(rssi))
+	(rssi_count, rssi_sum) = rtt.get("<II")
+	print("{},{}".format(rssi_count, rssi_sum))
 
 	x.append(time.time() - starttime)
-	y.append(-rssi)
+	y.append(-rssi_sum / rssi_count)
 
 	if len(x) > 100:
 		del x[0:len(x)-100]

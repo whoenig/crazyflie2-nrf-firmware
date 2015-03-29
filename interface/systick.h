@@ -28,4 +28,6 @@ void systickInit();
 
 unsigned int systickGetTick();
 
+void systickSetTick(unsigned int tickValue);
+
 #endif //__SYSTICK_H__
