@@ -1,60 +1,20 @@
 Crazyflie 2.0 NRF51 firmware
 ============================
 
-This branch is used to collect RSSI data between two Crazyflies.
-The receiver node needs to be connected via a J-Link EDU in order to read the results.
-There are separate helper scripts to automate the data collection on the PC-side.
+This branch is used to enable relative localization of a stationary Crazyflie swarm based on RSSI readings.
 
 Usage
 -----
 
+```
+make CF_CHANNEL=100 CF_POWER=Neg20dBm CF_DATARATE=250K CF_TOTALNUM=2 CF_ID=0 [clean, cload]
+```
+
 0. Clean: `make clean`
-0. Compile: `make CFMODE=RX` or `make CFMODE=TX`
+0. Compile: see above; every CF needs to have its own ID (requires clean build!)
 0. Press the button on the CF for 3 seconds until the two blue LEDs start to blink.
-0. Flash using Crazyradio: `make CFMODE=RX cload` or `make CFMODE=TX cload`
-0. Connect receiving Crazyflie via nrf Debug adapter and J-Link EDU to PC
-0. Run `./JLinkExe -device NRF51 -speed 4000 -if SWD` on the PC
-0. Run `python3 channelscanRTT.py` from the scripts folder
-0. Turn transmitting Crazyflie on
-
-Modes
------
-
-0. None
-
-This mode measures RSSI continously (fixed channel, power, and datarate). Results are averaged and sent via RTT to the PC.
-
-```
-make SCAN_MODE=NONE CF_CHANNEL=100 CF_POWER=Neg20dBm CF_DATARATE=250K CFMODE=[TX,RX] [clean, cload]
-python3 scanRTT.py
-```
-
-0. Channelscan
-
-This modes measures RSSI vs. channel (fixed power, and datarate).
-
-```
-make SCAN_MODE=CHANNEL CF_POWER=Neg20dBm CF_DATARATE=250K CFMODE=[TX,RX] [clean, cload]
-python3 channelscanRTT.py
-```
-
-0. Powerscan
-
-This modes measures RSSI vs. power (fixed channel, and datarate).
-
-```
-make SCAN_MODE=POWER CHANNEL=100 CF_DATARATE=250K CFMODE=[TX,RX] [clean, cload]
-python3 powerscanRTT.py
-```
-
-0. Dataratescan
-
-This modes measures RSSI vs. datarate (fixed channel, and power).
-
-```
-make SCAN_MODE=DATARATE CHANNEL=100 CF_POWER=Neg20dBm CFMODE=[TX,RX] [clean, cload]
-python3 dataratescanRTT.py
-```
+0. Flash using Crazyradio: `make cload`
+0. Run `python3 clocksync.py` to synchronize clock and start localization
 
 Setup J-Link
 ------------

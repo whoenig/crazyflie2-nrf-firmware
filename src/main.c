@@ -76,7 +76,7 @@ void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
     switch(crazy_state)
     {
       case waitToSync: // Reset clock
-        switch(received->data[1])
+        switch(received->data[0])
         {
           case CMD_CLOCKSYNC:
             systickSetTick(0);
@@ -164,6 +164,10 @@ void mainloop()
   EsbPacket packet;
   int i = 0;
 
+  for (i = 0; i < 32; ++i) {
+    packet.data[i] = 0x5;
+  }
+
   nrf_gpio_cfg_output(RADIO_PAEN_PIN);
   nrf_gpio_pin_set(RADIO_PAEN_PIN);
 
@@ -231,6 +235,10 @@ void mainloop()
         {
           crazy_state = localize;
           esbStopRx();
+          for(i = 0; i < totalnum; ++i)
+          {
+            SEGGER_RTT_printf(0, "%d, %d, %d\n", i, RSSI_Nbr[i].rssi_count, RSSI_Nbr[i].rssi_sum);
+          }
         }
       }
     }
@@ -240,7 +248,7 @@ void mainloop()
     {
       case signalTx:
         packet.data[0] = ID;
-        packet.size = 1;
+        packet.size = 32; // longer messages give us more samples
         packet.pid = (packet.pid + 1) % 4;
         esbSendPacket(&packet, PIPE_CF);
         break;
