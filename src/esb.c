@@ -164,7 +164,6 @@ void esbInterruptHandler()
       }
 
       pk = &recvPacket;
-      pk->rssi = (uint8_t) NRF_RADIO->RSSISAMPLE;
       pk->crc = NRF_RADIO->RXCRC;
       pk->rssi_sum = rssi_sum;
       pk->rssi_count = rssi_count;
