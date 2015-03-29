@@ -83,7 +83,7 @@ void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
             crazy_state = ((ID==0) ? signalTx : signalRx);
             break;
           default:
-            break;        
+            break;
         }
         break;
       default:
@@ -127,7 +127,7 @@ int main()
   NRF_GPIO->PIN_CNF[RADIO_PAEN_PIN] |= GPIO_PIN_CNF_DIR_Output | (GPIO_PIN_CNF_DRIVE_S0H1<<GPIO_PIN_CNF_DRIVE_Pos);
 
   crazy_state = waitToSync;
-  
+
   for(i = 0; i < totalnum; i++)
   {
     RSSI_Nbr[i].rssi_sum = 0;
@@ -143,7 +143,7 @@ int main()
 
   // setup as receiver initially
   esbSetPacketReceivedHandler(packetReceivedHandler);
-  esbStartRx();  
+  esbStartRx();
 
   mainloop();
 
@@ -162,7 +162,7 @@ void delayms(int delay)
 void mainloop()
 {
   EsbPacket packet;
-  int i = 0; 
+  int i = 0;
 
   nrf_gpio_cfg_output(RADIO_PAEN_PIN);
   nrf_gpio_pin_set(RADIO_PAEN_PIN);
@@ -174,7 +174,7 @@ void mainloop()
     {
       int cur_time = systickGetTick();
       if((cur_time >= ID*SIGNAL_TX_TIME) && (cur_time < (ID+1)*SIGNAL_TX_TIME))
-      { 
+      {
         if(!(crazy_state==signalTx))
         {
           crazy_state = signalTx;
@@ -241,8 +241,8 @@ void mainloop()
       case signalTx:
         packet.data[0] = ID;
         packet.size = 1;
-        packet.pid = (packet.pid + 1) % 4;        
-        esbSendPacket(&packet, PIPE_CF);          
+        packet.pid = (packet.pid + 1) % 4;
+        esbSendPacket(&packet, PIPE_CF);
         break;
       case dataShareTx: // ToDo
         break;
