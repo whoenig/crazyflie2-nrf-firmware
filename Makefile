@@ -4,11 +4,11 @@
 CLOAD_SCRIPT ?= ../crazyflie-clients-python/bin/cfloader
 
 S110 ?= 1     # SoftDevice flashed or not
-CFMODE ?= RX  # RX or TX
-SCAN_MODE ?= CHANNEL # NONE, CHANNEL, POWER, DATARATE
 CF_CHANNEL ?= 0 # 0 - 125
 CF_DATARATE ?= 250K # 250K, 1M, 2M
 CF_POWER ?= Pos4dBm # Pos4dBm, 0dBm, Neg4dBm, Neg8dBm, Neg12dBm, Neg16dBm, Neg20dBm, Neg30dBm
+CF_TOTALNUM ?= 5 # 1 - 100
+CF_ID ?= 0 # 0 - (CF_TOTALNUM-1)
 
 CROSS_COMPILE?=arm-none-eabi-
 
@@ -53,13 +53,11 @@ else
 LDFLAGS += -T gcc_nrf51_blank_xxaa.ld
 endif
 
-CFLAGS += -DCFMODE=CFMODE_$(strip $(CFMODE))
-CFLAGS += -DSCAN_MODE=SCAN_MODE_$(strip $(SCAN_MODE))
-
 CFLAGS += -DCF_CHANNEL=$(strip $(CF_CHANNEL))
 CFLAGS += -DCF_DATARATE=esbDatarate$(strip $(CF_DATARATE))
 CFLAGS += -DCF_POWER=RADIO_TXPOWER_TXPOWER_$(strip $(CF_POWER))
-
+CFLAGS += -DCF_TOTALNUM=$(strip $(CF_TOTALNUM))
+CFLAGS += -DCF_ID=$(strip $(CF_ID))
 
 OBJS += src/main.o gcc_startup_nrf51.o system_nrf51.o \
         src/systick.o src/button.o \

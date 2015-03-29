@@ -61,3 +61,8 @@ unsigned int systickGetTick()
   return tick;
 }
 
+// Custom function to set the timer to a desired value
+void systickSetTick(unsigned int tickValue)
+{
+  tick = tickValue;
+}
