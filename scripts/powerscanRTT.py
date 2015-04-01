@@ -7,7 +7,7 @@ from RTT import RTT
 rtt = RTT()
 
 p = pg.plot()
-p.setYRange(-80, -30)
+p.setYRange(-100, -30)
 p.setLabel('bottom', 'Time')
 p.setLabel('left', 'RSSI [dBM]')
 p.addLegend()

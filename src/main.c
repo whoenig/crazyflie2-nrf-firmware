@@ -274,6 +274,9 @@ void mainloop()
       #if SCAN_MODE == SCAN_MODE_DATARATE
         packet.data[0] = datarate;
       #endif
+      #if SCAN_MODE == SCAN_MODE_NONE
+        packet.noack = 1;
+      #endif
       ack = esbSendPacket(&packet);
       if (ack && ack->size)
       {

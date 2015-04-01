@@ -21,7 +21,7 @@ starttime = time.time()
 
 while True:
 	(rssi_count, rssi_sum) = rtt.get("<II")
-	print("{},{}".format(rssi_count, rssi_sum))
+	print("{},{},{}".format(rssi_count, rssi_sum, - rssi_sum / rssi_count))
 
 	x.append(time.time() - starttime)
 	y.append(-rssi_sum / rssi_count)
