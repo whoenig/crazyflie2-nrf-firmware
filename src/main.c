@@ -46,6 +46,7 @@
 #define SCAN_MODE_DATARATE 3
 
 static void mainloop(void);
+static void delayms(int delay);
 
 #if CFMODE == CFMODE_RX
   static unsigned int channel;
@@ -109,6 +110,56 @@ static void mainloop(void);
   static int txpower;
 #endif
 
+void enableSTM(bool enable, bool bootloader)
+{
+  if(enable)
+  {
+    NRF_GPIO->PIN_CNF[STM_NRST_PIN] = (GPIO_PIN_CNF_SENSE_Disabled << GPIO_PIN_CNF_SENSE_Pos)
+                                    | (GPIO_PIN_CNF_DRIVE_S0D1 << GPIO_PIN_CNF_DRIVE_Pos)
+                                    | (GPIO_PIN_CNF_PULL_Disabled << GPIO_PIN_CNF_PULL_Pos)
+                                    | (GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos)
+                                    | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
+    nrf_gpio_pin_clear(STM_NRST_PIN); //Hold STM reset
+    nrf_gpio_pin_set(PM_VCCEN_PIN);
+    delayms(2);
+    nrf_gpio_cfg_output(STM_BOOT0_PIN);
+    if (bootloader) {
+      nrf_gpio_pin_set(STM_BOOT0_PIN);
+    } else {
+      nrf_gpio_pin_clear(STM_BOOT0_PIN);
+    }
+
+    delayms(2);
+    nrf_gpio_pin_set(STM_NRST_PIN);
+
+     //Activate UART TX pin (otherwise bootloader won't execute firmware)
+    nrf_gpio_cfg_output(UART_TX_PIN);
+    nrf_gpio_pin_set(UART_TX_PIN);
+
+     // Set 500mA current
+    // nrf_gpio_cfg_output(PM_EN1);
+    // nrf_gpio_pin_set(PM_EN1);
+    // nrf_gpio_cfg_output(PM_EN2);
+    // nrf_gpio_pin_clear(PM_EN2);
+
+    // Sink battery divider
+    // nrf_gpio_cfg_output(PM_VBAT_SINK_PIN);
+    // nrf_gpio_pin_clear(PM_VBAT_SINK_PIN);
+  }
+  else
+  {
+    // Disable UART
+    nrf_gpio_cfg_input(UART_TX_PIN, NRF_GPIO_PIN_PULLDOWN);
+    // Hold reset
+    nrf_gpio_pin_clear(STM_NRST_PIN);
+    nrf_gpio_cfg_input(STM_BOOT0_PIN, NRF_GPIO_PIN_PULLDOWN);
+    nrf_gpio_cfg_input(STM_NRST_PIN, NRF_GPIO_PIN_PULLDOWN);
+    // Power off
+    nrf_gpio_pin_clear(PM_VCCEN_PIN);
+  }
+
+}
+
 int main()
 {
   systickInit();
@@ -125,8 +176,16 @@ int main()
   buttonInit(buttonIdle);
   LED_ON();
 
+  // Configure GPIO
   NRF_GPIO->PIN_CNF[RADIO_PAEN_PIN] |= GPIO_PIN_CNF_DIR_Output | (GPIO_PIN_CNF_DRIVE_S0H1<<GPIO_PIN_CNF_DRIVE_Pos);
 
+  /* PM-side IOs */
+  nrf_gpio_cfg_output(PM_VCCEN_PIN);
+  nrf_gpio_pin_clear(PM_VCCEN_PIN);
+  nrf_gpio_cfg_input(PM_PGOOD_PIN, NRF_GPIO_PIN_PULLUP);
+  nrf_gpio_cfg_input(PM_CHG_PIN, NRF_GPIO_PIN_PULLUP);
+
+  // Configure radio
   channel = CF_CHANNEL;
   datarate = CF_DATARATE;
   txpower = CF_POWER;
@@ -142,6 +201,8 @@ int main()
     esbSetPacketReceivedHandler(packetReceivedHandler);
     esbStartRx();
   #endif
+
+  enableSTM(true, false);
 
   mainloop();
 
@@ -300,6 +361,9 @@ void mainloop()
     ButtonEvent be = buttonGetState();
     if (be == buttonShortPress)
     {
+      //stop STM
+      enableSTM(false, false);
+
       //stop NRF
       LED_OFF();
       nrf_gpio_cfg_input(PM_VBAT_SINK_PIN, NRF_GPIO_PIN_NOPULL);
