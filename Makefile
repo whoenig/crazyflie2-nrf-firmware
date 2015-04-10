@@ -62,7 +62,7 @@ CFLAGS += -DCF_POWER=RADIO_TXPOWER_TXPOWER_$(strip $(CF_POWER))
 
 
 OBJS += src/main.o gcc_startup_nrf51.o system_nrf51.o \
-        src/systick.o src/button.o \
+        src/systick.o src/button.o src/uart.o src/syslink.o \
         src/esb.o \
         src/SEGGER_RTT.o src/SEGGER_RTT_printf.o
 

@@ -20,8 +20,8 @@ curve = p.plot()
 starttime = time.time()
 
 while True:
-	(rssi_count, rssi_sum) = rtt.get("<II")
-	print("{},{},{}".format(rssi_count, rssi_sum, - rssi_sum / rssi_count))
+	(rssi_count, rssi_sum, theta1, theta2) = rtt.get("<IIhh")
+	print("{},{},{},{},{}".format(rssi_count, rssi_sum, - rssi_sum / rssi_count, theta1, theta2))
 
 	x.append(time.time() - starttime)
 	y.append(-rssi_sum / rssi_count)

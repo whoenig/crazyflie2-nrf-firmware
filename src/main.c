@@ -32,6 +32,8 @@
 #include "button.h"
 #include "pinout.h"
 #include "systick.h"
+#include "syslink.h"
+#include "uart.h"
 
 #include "nrf_gpio.h"
 
@@ -67,6 +69,8 @@ static void delayms(int delay);
     {
       uint32_t rssi_count;
       uint32_t rssi_sum;
+      int16_t theta1; // yaw of the receiver, in degrees
+      int16_t theta2; // yaw of the transmitter, in degrees
     };
     static struct resultType result = {};
 
@@ -93,6 +97,7 @@ static void delayms(int delay);
       ack->data[3] = (received->rssi_sum >> 8) & 0xFF;
       result.rssi_sum += received->rssi_sum;
       result.rssi_count += received->rssi_count;
+      result.theta2 = (received->data[1] << 8) | received->data[0];
     #else
       ack->size = 4;
       ack->data[1] = received->rssi_count;
@@ -203,6 +208,7 @@ int main()
   #endif
 
   enableSTM(true, false);
+  uartInit();
 
   mainloop();
 
@@ -267,6 +273,7 @@ void mainloop()
   int i;
   EsbPacket packet;
   EsbPacket* ack;
+  int16_t yaw;
   for (i = 0; i < 32; ++i) {
     packet.data[i] = 0x5;
   }
@@ -276,6 +283,11 @@ void mainloop()
   #if SCAN_MODE == SCAN_MODE_NONE
     int lastPacket = systickGetTick();
   #endif
+#endif
+
+#if SCAN_MODE == SCAN_MODE_NONE
+  struct syslinkPacket slRxPacket;
+  bool slReceived;
 #endif
 
   nrf_gpio_cfg_output(RADIO_PAEN_PIN);
@@ -321,6 +333,20 @@ void mainloop()
           result.rssi_sum = 0;
           lastPacket = systickGetTick();
         }
+        slReceived = syslinkReceive(&slRxPacket);
+        if (slReceived)
+        {
+          if (slRxPacket.type == SYSLINK_SENSORS_POSE &&
+              slRxPacket.length == 3 * sizeof(float))
+          {
+            float roll, pitch, yaw;
+            memcpy(&roll, &slRxPacket.data[0], sizeof(float));
+            memcpy(&pitch, &slRxPacket.data[4], sizeof(float));
+            memcpy(&yaw, &slRxPacket.data[8], sizeof(float));
+            result.theta1 = (int16_t)yaw;
+            // SEGGER_RTT_printf(0, "%d,%d,%d\n", (int)roll, (int)pitch, (int)yaw);
+          }
+        }
       #endif
     #endif
     #if CFMODE == CFMODE_TX
@@ -336,6 +362,21 @@ void mainloop()
         packet.data[0] = datarate;
       #endif
       #if SCAN_MODE == SCAN_MODE_NONE
+        slReceived = syslinkReceive(&slRxPacket);
+        if (slReceived)
+        {
+          if (slRxPacket.type == SYSLINK_SENSORS_POSE &&
+              slRxPacket.length == 3 * sizeof(float))
+          {
+            float rollf, pitchf, yawf;
+            memcpy(&rollf, &slRxPacket.data[0], sizeof(float));
+            memcpy(&pitchf, &slRxPacket.data[4], sizeof(float));
+            memcpy(&yawf, &slRxPacket.data[8], sizeof(float));
+            yaw = (int16_t)yawf;
+          }
+        }
+        packet.data[0] = (uint8_t)yaw;
+        packet.data[1] = (uint8_t)(yaw>>8);
         packet.noack = 1;
       #endif
       ack = esbSendPacket(&packet);

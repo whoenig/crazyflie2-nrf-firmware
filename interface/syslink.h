@@ -62,4 +62,6 @@ bool syslinkSend(struct syslinkPacket *packet);
 #define SYSLINK_OW_READ 0x22
 #define SYSLINK_OW_WRITE 0x23
 
+#define SYSLINK_SENSORS_POSE  0x31
+
 #endif
