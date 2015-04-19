@@ -163,6 +163,7 @@ void mainloop()
 {
   EsbPacket packet;
   int i = 0;
+  int pos = 0;
 
   for (i = 0; i < 32; ++i) {
     packet.data[i] = 0x5;
@@ -208,6 +209,7 @@ void mainloop()
             }
           }
           crazy_state = dataShareTx;
+          pos = 0;
           esbStopRx();
         }
       }
@@ -229,16 +231,25 @@ void mainloop()
           esbStartRx();
         }
       }
-      else
+      else if(cur_time > totalnum*SIGNAL_TX_TIME + totalnum*DATASHARE_TX_TIME)
       {
         if(!(crazy_state==localize))
         {
-          crazy_state = localize;
-          esbStopRx();
-          for(i = 0; i < totalnum; ++i)
+          // be ready for the next run
+          crazy_state = waitToSync;
+          for(i = 0; i < totalnum; i++)
           {
-            SEGGER_RTT_printf(0, "%d, %d, %d\n", i, RSSI_Nbr[i].rssi_count, RSSI_Nbr[i].rssi_sum);
+            RSSI_Nbr[i].rssi_sum = 0;
+            RSSI_Nbr[i].rssi_count = 0;
           }
+
+          esbStartRx();
+          // crazy_state = localize;
+          // esbStopRx();
+          // for(i = 0; i < totalnum; ++i)
+          // {
+          //   SEGGER_RTT_printf(0, "%d, %d, %d\n", i, RSSI_Nbr[i].rssi_count, RSSI_Nbr[i].rssi_sum);
+          // }
         }
       }
     }
@@ -252,7 +263,20 @@ void mainloop()
         packet.pid = (packet.pid + 1) % 4;
         esbSendPacket(&packet, PIPE_CF);
         break;
-      case dataShareTx: // ToDo
+      case dataShareTx: // send to PC for now
+        if (pos < totalnum)
+        {
+          packet.data[0] = ID;
+          packet.data[1] = pos;
+          memcpy(&packet.data[2], &RSSI_Nbr[pos], 8);
+          packet.size = 10;
+          packet.pid = (packet.pid + 1) % 4;
+          EsbPacket* ack = esbSendPacket(&packet, PIPE_PC);
+          if (ack)
+          {
+            ++pos;
+          }
+        }
         break;
       case localize: // ToDo
         break;
