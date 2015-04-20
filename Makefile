@@ -4,11 +4,6 @@
 CLOAD_SCRIPT ?= ../crazyflie-clients-python/bin/cfloader
 
 S110 ?= 1     # SoftDevice flashed or not
-CFMODE ?= RX  # RX or TX
-SCAN_MODE ?= CHANNEL # NONE, CHANNEL, POWER, DATARATE
-CF_CHANNEL ?= 0 # 0 - 125
-CF_DATARATE ?= 250K # 250K, 1M, 2M
-CF_POWER ?= Pos4dBm # Pos4dBm, 0dBm, Neg4dBm, Neg8dBm, Neg12dBm, Neg16dBm, Neg20dBm, Neg30dBm
 
 CROSS_COMPILE?=arm-none-eabi-
 
