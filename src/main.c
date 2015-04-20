@@ -64,8 +64,8 @@ enum CrazyState {waitToSync, signalTx, signalRx, dataShareTx, dataShareRx, local
 enum{CMD_CLOCKSYNC = 1};
 enum{PIPE_CF = 0, PIPE_PC = 1};
 
-static const int SIGNAL_TX_TIME = 200; //ms
-static const int DATASHARE_TX_TIME = 200; //ms
+static const int SIGNAL_TX_TIME = 500; //ms
+static const int DATASHARE_TX_TIME = 100; //ms
 
 void packetReceivedHandler(EsbPacket* received, EsbPacket* ack)
 {
@@ -210,6 +210,7 @@ void mainloop()
           }
           crazy_state = dataShareTx;
           pos = 0;
+          esbSetTxPower(RADIO_TXPOWER_TXPOWER_Pos4dBm);
           esbStopRx();
         }
       }
@@ -235,6 +236,10 @@ void mainloop()
       {
         if(!(crazy_state==localize))
         {
+          for(i = 0; i < totalnum; ++i)
+          {
+            SEGGER_RTT_printf(0, "%d, %d, %d\n", i, RSSI_Nbr[i].rssi_count, RSSI_Nbr[i].rssi_sum);
+          }
           // be ready for the next run
           crazy_state = waitToSync;
           for(i = 0; i < totalnum; i++)
@@ -242,17 +247,17 @@ void mainloop()
             RSSI_Nbr[i].rssi_sum = 0;
             RSSI_Nbr[i].rssi_count = 0;
           }
-
+          esbStopRx();
+          esbSetTxPower(txpower);
           esbStartRx();
           // crazy_state = localize;
           // esbStopRx();
-          // for(i = 0; i < totalnum; ++i)
-          // {
-          //   SEGGER_RTT_printf(0, "%d, %d, %d\n", i, RSSI_Nbr[i].rssi_count, RSSI_Nbr[i].rssi_sum);
-          // }
+
         }
       }
     }
+
+    // SEGGER_RTT_printf(0, "%d\n", crazy_state);
 
     //Take appropriate action according to current state
     switch(crazy_state)
@@ -261,7 +266,9 @@ void mainloop()
         packet.data[0] = ID;
         packet.size = 32; // longer messages give us more samples
         packet.pid = (packet.pid + 1) % 4;
+        packet.noack = true;
         esbSendPacket(&packet, PIPE_CF);
+        // delayms(10);
         break;
       case dataShareTx: // send to PC for now
         if (pos < totalnum)
@@ -271,6 +278,7 @@ void mainloop()
           memcpy(&packet.data[2], &RSSI_Nbr[pos], 8);
           packet.size = 10;
           packet.pid = (packet.pid + 1) % 4;
+          packet.noack = false;
           EsbPacket* ack = esbSendPacket(&packet, PIPE_PC);
           if (ack)
           {

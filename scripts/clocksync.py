@@ -9,11 +9,14 @@ with Crazyradio(0) as radio:
 	radio.set_address([0xE7, 0xE7, 0xE7, 0xE7, 0xE8])
 	# for j in range(0, 10):
 	res = radio.send_packet([1])
-	print(res)
+	# print(res)
 	radio.set_radio_mode(Crazyradio.MODE_PRX)
-	for j in range(0, TOTALNUM * TOTALNUM):
+	# for j in range(0, TOTALNUM * TOTALNUM):
+	while True:
 		res = radio.receive()
-		print(res)
+		# print(res)
 		receiverId, senderId, rssi_count, rssi_sum = struct.unpack("<BBII", res)
 		if rssi_count > 0:
 			print("{}<-{}: {} (count: {})".format(receiverId, senderId, rssi_sum / rssi_count, rssi_count))
+		if receiverId == TOTALNUM - 1 and senderId == TOTALNUM - 1:
+			break

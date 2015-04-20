@@ -178,15 +178,26 @@ void esbInterruptHandler()
       addressmatch = false;
 
       // If this packet is a retry, send the same ACK again
-      if (isRetry(pk)) {
-        setupAck(true);
-        // SEGGER_RTT_printf(0, "D");
-        return;
+      if (!pk->noack)
+      {
+        if (isRetry(pk)) {
+          setupAck(true);
+          // SEGGER_RTT_printf(0, "D");
+          return;
+        }
+
+        // Good packet received, yea!
+        setupAck(false);
       }
-
-      // Good packet received, yea!
-      setupAck(false);
-
+      else
+      {
+        if (packetReceivedHandler)
+        {
+          packetReceivedHandler(&recvPacket, &ackPacket);
+        }
+        // continue receiving
+        NRF_RADIO->TASKS_START = 1UL;
+      }
       break;
     case doAck:
       //Setup RX for next packet
@@ -194,13 +205,24 @@ void esbInterruptHandler()
       break;
     case doPtxTx:
       // SEGGER_RTT_printf(0, "T");
-      NRF_RADIO->PACKETPTR = (uint32_t)&recvPacket;
-      // switch to receive ack after task is disabled
-      // NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_TXEN_Msk;
-      // NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RXEN_Msk;
-      rs = doPtxAck;
-      // NRF_RADIO->TASKS_TXEN;
-      // NRF_RADIO->TASKS_DISABLE = 1UL;
+      if (!((EsbPacket*)NRF_RADIO->PACKETPTR)->noack)
+      {
+        NRF_RADIO->PACKETPTR = (uint32_t)&recvPacket;
+        // switch to receive ack after task is disabled
+        // NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_TXEN_Msk;
+        // NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RXEN_Msk;
+        rs = doPtxAck;
+        // NRF_RADIO->TASKS_TXEN;
+        // NRF_RADIO->TASKS_DISABLE = 1UL;
+      }
+      else
+      {
+        // disable radio (and make sure no short triggers another RX or Tx)
+        // NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_TXEN_Msk;
+        // NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
+        // NRF_RADIO->TASKS_DISABLE = 1UL;
+        rs = doNothing;
+      }
       break;
     case doPtxAck:
       // SEGGER_RTT_printf(0, "R");
@@ -416,7 +438,14 @@ EsbPacket* esbSendPacket(EsbPacket* packet, uint8_t pipe)
 
   // NRF_RADIO->PACKETPTR = (uint32_t)packet;
   // After being disabled the radio will automatically receive
-  NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RXEN_Msk;
+  if (!packet->noack)
+  {
+    NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RXEN_Msk;
+  }
+  else
+  {
+    NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
+  }
   NRF_RADIO->SHORTS |= RADIO_SHORTS_END_DISABLE_Msk;
   NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_TXEN_Msk;
   rs = doPtxTx;
@@ -426,17 +455,24 @@ EsbPacket* esbSendPacket(EsbPacket* packet, uint8_t pipe)
 
   // SEGGER_RTT_printf(0, "%d\n", NRF_RADIO->STATE);
 
-  // wait 2ms max
-  while (startTime + 2 >= systickGetTick()) {
-    if (receivedAck) {
-      return &recvPacket;
+  if (!packet->noack)
+  {
+    // wait 2ms max
+    while (startTime + 2 >= systickGetTick()) {
+      if (receivedAck) {
+        return &recvPacket;
+      }
     }
-  }
 
-  NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_TXEN_Msk;
-  NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
-  NRF_RADIO->SHORTS &= ~RADIO_SHORTS_END_DISABLE_Msk;
-  NRF_RADIO->TASKS_DISABLE = 1UL;
+    NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_TXEN_Msk;
+    NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
+    NRF_RADIO->SHORTS &= ~RADIO_SHORTS_END_DISABLE_Msk;
+    NRF_RADIO->TASKS_DISABLE = 1UL;
+  }
+  else
+  {
+    while(NRF_RADIO->EVENTS_DISABLED == 0U);
+  }
   return NULL;
 }
 
